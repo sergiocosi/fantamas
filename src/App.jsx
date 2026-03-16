@@ -237,6 +237,22 @@ export default function FantaMasMockup() {
   const [operatorTargetUserId, setOperatorTargetUserId] = useState('marco');
   const [operatorRuleId, setOperatorRuleId] = useState('rifiuto-partecipare');
   const [operatorNote, setOperatorNote] = useState('');
+  const [newBoyName, setNewBoyName] = useState('');
+  const [newRuleCategory, setNewRuleCategory] = useState('');
+  const [newRuleLabel, setNewRuleLabel] = useState('');
+  const [newRulePoints, setNewRulePoints] = useState('');
+  const [newRuleKind, setNewRuleKind] = useState('bonus');
+  const [newRuleSelectable, setNewRuleSelectable] = useState(true);
+  const [deleteBoyId, setDeleteBoyId] = useState('marco');
+  const [deleteRuleId, setDeleteRuleId] = useState('');
+  const [editRuleId, setEditRuleId] = useState('');
+  const [editRuleCategory, setEditRuleCategory] = useState('');
+  const [editRuleLabel, setEditRuleLabel] = useState('');
+  const [editRulePoints, setEditRulePoints] = useState('');
+  const [editRuleKind, setEditRuleKind] = useState('bonus');
+  const [editRuleSelectable, setEditRuleSelectable] = useState(true);
+  const [editBoyId, setEditBoyId] = useState('');
+  const [editBoyName, setEditBoyName] = useState('');
   const [modifyDraft, setModifyDraft] = useState({ requestId: '', finalPoints: '', note: '' });
 
   useEffect(() => {
@@ -246,6 +262,42 @@ export default function FantaMasMockup() {
   useEffect(() => {
     saveState(appState);
   }, [appState]);
+
+  useEffect(() => {
+  if (!deleteRuleId && appState.rules.length > 0) {
+    setDeleteRuleId(appState.rules[0].id);
+  }
+  }, [appState.rules, deleteRuleId]);
+
+  useEffect(() => {
+  if (!editRuleId && appState.rules.length > 0) {
+    setEditRuleId(appState.rules[0].id);
+    return;
+  }
+
+  const selectedRule = appState.rules.find(rule => rule.id === editRuleId);
+  if (!selectedRule) return;
+
+  setEditRuleCategory(selectedRule.category);
+  setEditRuleLabel(selectedRule.label);
+  setEditRulePoints(String(selectedRule.points));
+  setEditRuleKind(selectedRule.kind);
+  setEditRuleSelectable(selectedRule.boySelectable);
+}, [appState.rules, editRuleId]);
+
+useEffect(() => {
+  const boys = appState.users.filter(user => user.role === 'boy');
+
+  if (!editBoyId && boys.length > 0) {
+    setEditBoyId(boys[0].id);
+    return;
+  }
+
+  const selectedBoy = appState.users.find(user => user.id === editBoyId && user.role === 'boy');
+  if (!selectedBoy) return;
+
+  setEditBoyName(selectedBoy.name);
+}, [appState.users, editBoyId]);
 
   const currentUser = useMemo(() => appState.users.find(user => user.id === currentUserId) || null, [appState.users, currentUserId]);
   const categories = useMemo(() => Object.values(groupRules(appState.rules)), [appState.rules]);
@@ -340,6 +392,242 @@ export default function FantaMasMockup() {
       }),
     }));
     setModifyDraft({ requestId: '', finalPoints: '', note: '' });
+  }
+
+  function addNewBoy() {
+  const cleanName = newBoyName.trim();
+  if (!cleanName) return;
+
+  const normalizedId = cleanName
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  const finalId = normalizedId || `ragazzo-${Date.now()}`;
+
+  const alreadyExists = appState.users.some(
+    user => user.id === finalId || user.name.toLowerCase() === cleanName.toLowerCase()
+  );
+
+  if (alreadyExists) return;
+
+  const newUser = {
+    id: finalId,
+    name: cleanName,
+    role: 'boy',
+  };
+
+  setAppState(previous => ({
+    ...previous,
+    users: [...previous.users, newUser],
+  }));
+
+  setNewBoyName('');
+  setOperatorTargetUserId(finalId);
+}
+
+function deleteBoy() {
+  if (!deleteBoyId) return;
+
+  setAppState(previous => {
+    const userToDelete = previous.users.find(user => user.id === deleteBoyId);
+    if (!userToDelete || userToDelete.role !== 'boy') return previous;
+
+    const nextUsers = previous.users.filter(user => user.id !== deleteBoyId);
+    const nextRequests = previous.requests.filter(request => request.userId !== deleteBoyId);
+
+    return {
+      ...previous,
+      users: nextUsers,
+      requests: nextRequests,
+    };
+  });
+
+  setDeleteBoyId('');
+}
+
+function addNewRule() {
+  const category = newRuleCategory.trim();
+  const label = newRuleLabel.trim();
+  const points = Number(newRulePoints);
+
+  if (!category || !label || Number.isNaN(points)) return;
+
+  const normalizedId = `${category}-${label}`
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  const finalId = normalizedId || `regola-${Date.now()}`;
+
+  const alreadyExists = appState.rules.some(
+    rule => rule.id === finalId || rule.label.toLowerCase() === label.toLowerCase()
+  );
+
+  if (alreadyExists) return;
+
+  const colorByCategory = {
+    pulizia: 'sky',
+    pranzo: 'orange',
+    rifiuti: 'emerald',
+    cucina: 'amber',
+    uscite: 'cyan',
+    spesa: 'cyan',
+    didattica: 'violet',
+    podcast: 'violet',
+    laboratori: 'violet',
+    cura: 'teal',
+    attenzione: 'rose',
+  };
+
+  const iconByCategory = {
+    pulizia: '🧹',
+    pranzo: '🍽️',
+    rifiuti: '♻️',
+    cucina: '🍳',
+    uscite: '🛒',
+    spesa: '🛒',
+    didattica: '🎙️',
+    podcast: '🎙️',
+    laboratori: '🎙️',
+    cura: '👕',
+    attenzione: '⚠️',
+  };
+
+  const categoryKey = category.toLowerCase();
+  const matchedColor =
+    Object.keys(colorByCategory).find(key => categoryKey.includes(key));
+  const matchedIcon =
+    Object.keys(iconByCategory).find(key => categoryKey.includes(key));
+
+  const newRule = {
+    id: finalId,
+    category,
+    label,
+    points,
+    kind: newRuleKind,
+    boySelectable: newRuleSelectable,
+    icon: matchedIcon ? iconByCategory[matchedIcon] : (newRuleKind === 'malus' ? '⚠️' : '⭐'),
+    color: matchedColor ? colorByCategory[matchedColor] : (newRuleKind === 'malus' ? 'rose' : 'orange'),
+  };
+
+  setAppState(previous => ({
+    ...previous,
+    rules: [...previous.rules, newRule],
+  }));
+
+  setNewRuleCategory('');
+  setNewRuleLabel('');
+  setNewRulePoints('');
+  setNewRuleKind('bonus');
+  setNewRuleSelectable(true);
+}
+
+  function deleteRule() {
+  if (!deleteRuleId) return;
+
+  setAppState(previous => {
+    const nextRules = previous.rules.filter(rule => rule.id !== deleteRuleId);
+    const nextRequests = previous.requests.filter(request => request.ruleId !== deleteRuleId);
+
+    return {
+      ...previous,
+      rules: nextRules,
+      requests: nextRequests,
+    };
+  });
+
+  setDeleteRuleId('');
+}
+
+  function updateRule() {
+  if (!editRuleId) return;
+
+  const category = editRuleCategory.trim();
+  const label = editRuleLabel.trim();
+  const points = Number(editRulePoints);
+
+  if (!category || !label || Number.isNaN(points)) return;
+
+  const colorByCategory = {
+    pulizia: 'sky',
+    pranzo: 'orange',
+    rifiuti: 'emerald',
+    cucina: 'amber',
+    uscite: 'cyan',
+    spesa: 'cyan',
+    didattica: 'violet',
+    podcast: 'violet',
+    laboratori: 'violet',
+    cura: 'teal',
+    attenzione: 'rose',
+  };
+
+  const iconByCategory = {
+    pulizia: '🧹',
+    pranzo: '🍽️',
+    rifiuti: '♻️',
+    cucina: '🍳',
+    uscite: '🛒',
+    spesa: '🛒',
+    didattica: '🎙️',
+    podcast: '🎙️',
+    laboratori: '🎙️',
+    cura: '👕',
+    attenzione: '⚠️',
+  };
+
+  const categoryKey = category.toLowerCase();
+  const matchedColor =
+    Object.keys(colorByCategory).find(key => categoryKey.includes(key));
+  const matchedIcon =
+    Object.keys(iconByCategory).find(key => categoryKey.includes(key));
+
+  setAppState(previous => ({
+    ...previous,
+    rules: previous.rules.map(rule => {
+      if (rule.id !== editRuleId) return rule;
+
+      return {
+        ...rule,
+        category,
+        label,
+        points,
+        kind: editRuleKind,
+        boySelectable: editRuleSelectable,
+        icon: matchedIcon ? iconByCategory[matchedIcon] : (editRuleKind === 'malus' ? '⚠️' : '⭐'),
+        color: matchedColor ? colorByCategory[matchedColor] : (editRuleKind === 'malus' ? 'rose' : 'orange'),
+      };
+    }),
+  }));
+}
+
+  function updateBoy() {
+    const cleanName = editBoyName.trim();
+    if (!editBoyId || !cleanName) return;
+
+    const duplicateName = appState.users.some(
+      user =>
+        user.role === 'boy' &&
+        user.id !== editBoyId &&
+        user.name.toLowerCase() === cleanName.toLowerCase()
+    );
+
+    if (duplicateName) return;
+
+    setAppState(previous => ({
+      ...previous,
+      users: previous.users.map(user =>
+        user.id === editBoyId ? { ...user, name: cleanName } : user
+      ),
+      requests: previous.requests.map(request =>
+        request.userId === editBoyId ? { ...request, userName: cleanName } : request
+      ),
+    }));
   }
 
   function addManualOperatorEntry() {
@@ -671,6 +959,265 @@ export default function FantaMasMockup() {
       <Shell title="Aggiunta manuale punti" subtitle="Per bonus e malus decisi dagli operatori." onBack={() => setScreen('operator-home')} onReset={resetDemo} currentUser={currentUser}>
         <div className="max-w-3xl">
           <Card>
+            <div className="mb-6 pb-6 border-b border-neutral-200">
+              <div className="text-lg font-bold mb-3">Aggiungi un ragazzo</div>
+              <div className="grid md:grid-cols-[1fr_auto] gap-3">
+                <input
+                  value={newBoyName}
+                  onChange={event => setNewBoyName(event.target.value)}
+                  className="w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+                  placeholder="Scrivi il nome del ragazzo"
+                />
+                <button
+                  onClick={addNewBoy}
+                  className="rounded-2xl px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
+                >
+                  Aggiungi ragazzo
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-6 pb-6 border-b border-neutral-200">
+              <div className="text-lg font-bold mb-3">Elimina un ragazzo</div>
+              <div className="grid md:grid-cols-[1fr_auto] gap-3">
+                <select
+                  value={deleteBoyId}
+                  onChange={event => setDeleteBoyId(event.target.value)}
+                  className="w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
+                >
+                  <option value="">Seleziona un ragazzo</option>
+                  {appState.users
+                    .filter(user => user.role === 'boy')
+                    .map(user => (
+                      <option key={user.id} value={user.id}>{user.name}</option>
+                    ))}
+                </select>
+
+                <button
+                  onClick={deleteBoy}
+                  className="rounded-2xl px-5 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-sm"
+                >
+                  Elimina ragazzo
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-6 pb-6 border-b border-neutral-200">
+            <div className="text-lg font-bold mb-3">Modifica un ragazzo</div>
+
+            <div className="grid gap-4">
+              <div>
+                <label className="text-sm font-semibold text-neutral-700">Ragazzo da modificare</label>
+                <select
+                  value={editBoyId}
+                  onChange={event => setEditBoyId(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
+                >
+                  {appState.users
+                    .filter(user => user.role === 'boy')
+                    .map(user => (
+                      <option key={user.id} value={user.id}>{user.name}</option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-neutral-700">Nuovo nome</label>
+                <input
+                  value={editBoyName}
+                  onChange={event => setEditBoyName(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+                />
+              </div>
+
+              <div>
+                <button
+                  onClick={updateBoy}
+                  className="rounded-2xl px-5 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold shadow-sm"
+                >
+                  Salva modifica ragazzo
+                </button>
+              </div>
+            </div>
+          </div>
+                  
+            <div className="mb-6 pb-6 border-b border-neutral-200">
+              <div className="text-lg font-bold mb-3">Aggiungi una regola</div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-semibold text-neutral-700">Categoria</label>
+                  <input
+                    value={newRuleCategory}
+                    onChange={event => setNewRuleCategory(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+                    placeholder="Es. Pulizia, Pranzo, Laboratori..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-neutral-700">Etichetta</label>
+                  <input
+                    value={newRuleLabel}
+                    onChange={event => setNewRuleLabel(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+                    placeholder="Es. Ho sistemato gli scaffali"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-neutral-700">Punti</label>
+                  <input
+                    value={newRulePoints}
+                    onChange={event => setNewRulePoints(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+                    placeholder="Es. 3 oppure -5"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-neutral-700">Tipo</label>
+                  <select
+                    value={newRuleKind}
+                    onChange={event => setNewRuleKind(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
+                  >
+                    <option value="bonus">Bonus</option>
+                    <option value="malus">Malus</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center gap-3">
+                <input
+                  id="boySelectable"
+                  type="checkbox"
+                  checked={newRuleSelectable}
+                  onChange={event => setNewRuleSelectable(event.target.checked)}
+                />
+                <label htmlFor="boySelectable" className="text-sm font-semibold text-neutral-700">
+                  Selezionabile dai ragazzi
+                </label>
+              </div>
+
+              <div className="mt-4">
+                <button
+                  onClick={addNewRule}
+                  className="rounded-2xl px-5 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold shadow-sm"
+                >
+                  Aggiungi regola
+                </button>
+              </div>
+            </div>
+            
+            <div className="mb-6 pb-6 border-b border-neutral-200">
+              <div className="text-lg font-bold mb-3">Elimina una regola</div>
+              <div className="grid md:grid-cols-[1fr_auto] gap-3">
+                <select
+                  value={deleteRuleId}
+                  onChange={event => setDeleteRuleId(event.target.value)}
+                  className="w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
+                >
+                  <option value="">Seleziona una regola</option>
+                  {appState.rules.map(rule => (
+                    <option key={rule.id} value={rule.id}>
+                      {rule.category} — {rule.label}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  onClick={deleteRule}
+                  className="rounded-2xl px-5 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-sm"
+                >
+                  Elimina regola
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-6 pb-6 border-b border-neutral-200">
+            <div className="text-lg font-bold mb-3">Modifica una regola</div>
+
+            <div className="grid gap-4">
+              <div>
+                <label className="text-sm font-semibold text-neutral-700">Regola da modificare</label>
+                <select
+                  value={editRuleId}
+                  onChange={event => setEditRuleId(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
+                >
+                  {appState.rules.map(rule => (
+                    <option key={rule.id} value={rule.id}>
+                      {rule.category} — {rule.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-semibold text-neutral-700">Categoria</label>
+                  <input
+                    value={editRuleCategory}
+                    onChange={event => setEditRuleCategory(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-neutral-700">Etichetta</label>
+                  <input
+                    value={editRuleLabel}
+                    onChange={event => setEditRuleLabel(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-neutral-700">Punti</label>
+                  <input
+                    value={editRulePoints}
+                    onChange={event => setEditRulePoints(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-neutral-700">Tipo</label>
+                  <select
+                    value={editRuleKind}
+                    onChange={event => setEditRuleKind(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
+                  >
+                    <option value="bonus">Bonus</option>
+                    <option value="malus">Malus</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  id="editRuleSelectable"
+                  type="checkbox"
+                  checked={editRuleSelectable}
+                  onChange={event => setEditRuleSelectable(event.target.checked)}
+                />
+                <label htmlFor="editRuleSelectable" className="text-sm font-semibold text-neutral-700">
+                  Selezionabile dai ragazzi
+                </label>
+              </div>
+
+              <div>
+                <button
+                  onClick={updateRule}
+                  className="rounded-2xl px-5 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold shadow-sm"
+                >
+                  Salva modifica regola
+                </button>
+              </div>
+            </div>
+          </div>
+
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-semibold text-neutral-700">Ragazzo</label>
