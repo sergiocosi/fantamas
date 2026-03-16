@@ -285,6 +285,8 @@ function Pill({ children, className = '' }) {
   return <div className={`inline-flex rounded-full px-3 py-1 text-sm font-medium border ${className}`}>{children}</div>;
 }
 
+const OPERATOR_PASSWORD = import.meta.env.VITE_OPERATOR_PASSWORD;
+
 export default function FantaMasMockup() {
   const [appState, setAppState] = useState({
     users: [],
@@ -315,6 +317,8 @@ export default function FantaMasMockup() {
   const [editBoyId, setEditBoyId] = useState('');
   const [editBoyName, setEditBoyName] = useState('');
   const [modifyDraft, setModifyDraft] = useState({ requestId: '', finalPoints: '', note: '' });
+  const [operatorPasswordInput, setOperatorPasswordInput] = useState('');
+  const [operatorAccessGranted, setOperatorAccessGranted] = useState(false);
 
   useEffect(() => {
     runSelfChecks();
@@ -451,12 +455,37 @@ useEffect(() => {
     saveState(fresh);
   }
 
-  function loginAs(userId) {
-    const user = appState.users.find(item => item.id === userId);
-    if (!user) return;
+function loginAs(userId) {
+  const user = appState.users.find(item => item.id === userId);
+  if (!user) return;
+
+  if (user.role === 'operator') {
     setCurrentUserId(userId);
-    setScreen(user.role === 'operator' ? 'operator-home' : 'boy-home');
+    setScreen('operator-login');
+    return;
   }
+
+  setCurrentUserId(userId);
+  setScreen('boy-home');
+}
+
+function submitOperatorPassword() {
+  if (operatorPasswordInput === OPERATOR_PASSWORD) {
+    setOperatorAccessGranted(true);
+    setOperatorPasswordInput('');
+    setScreen('operator-home');
+    return;
+  }
+
+  alert('Password operatore non corretta');
+}
+
+function logoutOperator() {
+  setOperatorAccessGranted(false);
+  setOperatorPasswordInput('');
+  setCurrentUserId('');
+  setScreen('landing');
+}
 
   async function submitRequest() {
   if (!currentUser || !selectedRule) return;
@@ -1053,9 +1082,41 @@ async function addManualOperatorEntry() {
     );
   }
 
-  if (screen === 'operator-home' && currentUser) {
+  if (screen === 'operator-login' && currentUser) {
+  return (
+    <Shell
+      title="Accesso Operatore"
+      subtitle="Inserisci la password per continuare."
+      onBack={() => setScreen('landing')}
+      currentUser={currentUser}
+    >
+      <div className="max-w-xl">
+        <Card>
+          <div className="text-lg font-bold mb-3">Password operatore</div>
+          <input
+            type="password"
+            value={operatorPasswordInput}
+            onChange={event => setOperatorPasswordInput(event.target.value)}
+            className="w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+            placeholder="Inserisci la password"
+          />
+          <div className="mt-4">
+            <button
+              onClick={submitOperatorPassword}
+              className="rounded-2xl px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-sm"
+            >
+              Entra
+            </button>
+          </div>
+        </Card>
+      </div>
+    </Shell>
+  );
+}
+
+  if (screen === 'operator-home' && currentUser && operatorAccessGranted) {
     return (
-      <Shell title="Area Operatori" subtitle="Controllo rapido delle attività." onBack={() => setScreen('landing')} onReset={resetDemo} currentUser={currentUser}>
+      <Shell title="Area Operatori" subtitle="Controllo rapido delle attività." onBack={logoutOperator} onReset={resetDemo} currentUser={currentUser}>
         <div className="grid lg:grid-cols-4 gap-4">
           <Card className="bg-slate-900 text-white lg:col-span-1">
             <div className="text-sm text-slate-300 uppercase tracking-wider">Richieste in attesa</div>
@@ -1082,7 +1143,7 @@ async function addManualOperatorEntry() {
     );
   }
 
-  if (screen === 'operator-requests' && currentUser) {
+  if (screen === 'operator-requests' && currentUser && operatorAccessGranted) {
     return (
       <Shell title="Richieste da verificare" subtitle="Conferma le attività inviate dai ragazzi." onBack={() => setScreen('operator-home')} onReset={resetDemo} currentUser={currentUser}>
         <div className="grid gap-3">
@@ -1140,7 +1201,7 @@ async function addManualOperatorEntry() {
     );
   }
 
-  if (screen === 'operator-manual' && currentUser) {
+  if (screen === 'operator-manual' && currentUser && operatorAccessGranted) {
     const operatorRules = appState.rules.filter(rule => !rule.boySelectable || rule.kind === 'bonus');
     const boys = appState.users.filter(user => user.role === 'boy');
     return (
@@ -1454,7 +1515,7 @@ async function addManualOperatorEntry() {
     );
   }
 
-  if (screen === 'operator-history' && currentUser) {
+  if (screen === 'operator-history' && currentUser && operatorAccessGranted) {
     const history = [...appState.requests].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     return (
       <Shell title="Storico" subtitle="Ultimi movimenti registrati." onBack={() => setScreen('operator-home')} onReset={resetDemo} currentUser={currentUser}>
