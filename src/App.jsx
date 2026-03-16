@@ -436,19 +436,19 @@ export default function FantaMasMockup() {
           </Card>
 
           <div className="lg:col-span-2 grid sm:grid-cols-3 gap-4">
-            <ActionButton onClick={() => setScreen('boy-categories')}>
+            <ActionButton onClick={() => setScreen('boy-categories')} className="border-orange-200 bg-orange-50 hover:bg-orange-100">
               <div className="text-3xl mb-2">➕</div>
-              <div className="font-semibold">Aggiungi attività</div>
+              <div className="font-bold">Aggiungi attività</div>
               <div className="text-sm text-neutral-600">Invia una richiesta punti</div>
             </ActionButton>
-            <ActionButton onClick={() => setScreen('boy-leaderboard')}>
+            <ActionButton onClick={() => setScreen('boy-leaderboard')} className="border-amber-200 bg-amber-50 hover:bg-amber-100">
               <div className="text-3xl mb-2">🏆</div>
-              <div className="font-semibold">Classifica</div>
+              <div className="font-bold">Classifica</div>
               <div className="text-sm text-neutral-600">Guarda il gruppo</div>
             </ActionButton>
-            <ActionButton onClick={() => setScreen('boy-requests')}>
+            <ActionButton onClick={() => setScreen('boy-requests')} className="border-sky-200 bg-sky-50 hover:bg-sky-100">
               <div className="text-3xl mb-2">📋</div>
-              <div className="font-semibold">Le mie richieste</div>
+              <div className="font-bold">Le mie richieste</div>
               <div className="text-sm text-neutral-600">Controlla lo stato</div>
             </ActionButton>
           </div>
@@ -538,7 +538,7 @@ export default function FantaMasMockup() {
             <Card key={request.id} className={STATUS_STYLES[request.status] || ''}>
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div>
-                  <div className="font-semibold">{request.activity}</div>
+                  <div className="font-bold text-lg">{request.activity}</div>
                   <div className="text-sm opacity-80 mt-1">{formatDate(request.createdAt)}</div>
                   {request.note && <div className="text-sm mt-2">Nota: {request.note}</div>}
                 </div>
@@ -559,16 +559,16 @@ export default function FantaMasMockup() {
       <Shell title="Classifica" subtitle="Punteggio totale demo." onBack={() => setScreen('boy-home')} onReset={resetDemo} currentUser={currentUser}>
         <div className="max-w-4xl grid gap-3">
           {leaderboard.map((item, index) => (
-            <Card key={item.id} className={item.id === currentUser.id ? 'border-orange-300 bg-orange-50' : ''}>
+            <Card key={item.id} className={item.id === currentUser.id ? 'border-orange-300 bg-orange-50 shadow-lg' : ''}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold">{index + 1}</div>
+                  <div className="w-12 h-12 rounded-full bg-neutral-900 text-white flex items-center justify-center font-black text-lg">{index + 1}</div>
                   <div>
                     <div className="font-semibold">{item.name}</div>
                     {item.id === currentUser.id && <div className="text-sm text-neutral-600">Questo sei tu</div>}
                   </div>
                 </div>
-                <div className="text-xl font-bold">{item.points}</div>
+                <div className="text-2xl font-black text-orange-600">{item.points}</div>
               </div>
             </Card>
           ))}
@@ -582,8 +582,9 @@ export default function FantaMasMockup() {
       <Shell title="Area Operatori" subtitle="Controllo rapido delle attività." onBack={() => setScreen('landing')} onReset={resetDemo} currentUser={currentUser}>
         <div className="grid lg:grid-cols-4 gap-4">
           <Card className="bg-slate-900 text-white lg:col-span-1">
-            <div className="text-sm text-slate-300">Richieste in attesa</div>
-            <div className="text-5xl font-bold mt-2">{pendingRequests.length}</div>
+            <div className="text-sm text-slate-300 uppercase tracking-wider">Richieste in attesa</div>
+            <div className="text-6xl font-black mt-2">{pendingRequests.length}</div>
+            <div className="text-sm text-slate-300 mt-2">Da controllare adesso</div>
           </Card>
           <ActionButton onClick={() => setScreen('operator-requests')}>
             <div className="text-3xl mb-2">✅</div>
@@ -614,14 +615,25 @@ export default function FantaMasMockup() {
             <Card key={request.id}>
               <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4">
                 <div>
-                  <div className="text-sm text-neutral-500">{request.userName}</div>
-                  <div className="text-xl font-semibold">{request.activity}</div>
-                  <div className="text-sm text-neutral-600 mt-1">{formatDate(request.createdAt)} · punti proposti: {request.points > 0 ? '+' : ''}{request.points}</div>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <Pill className="bg-orange-50 border-orange-200 text-orange-700">{request.userName}</Pill>
+                    <Pill className="bg-emerald-50 border-emerald-200 text-emerald-700">
+                      {request.points > 0 ? '+' : ''}{request.points} punti
+                    </Pill>
+                  </div>
+                  <div className="text-xl font-bold">{request.activity}</div>
+                  <div className="text-sm text-neutral-600 mt-1">{formatDate(request.createdAt)}</div>
                 </div>
                 <div className="flex flex-wrap gap-2 xl:max-w-md">
-                  <button onClick={() => decideRequest(request.id, 'approve')} className="rounded-2xl px-4 py-2 bg-emerald-600 text-white">Approva</button>
-                  <button onClick={() => startModify(request)} className="rounded-2xl px-4 py-2 bg-sky-600 text-white">Modifica</button>
-                  <button onClick={() => decideRequest(request.id, 'reject')} className="rounded-2xl px-4 py-2 bg-rose-600 text-white">Rifiuta</button>
+                  <button onClick={() => decideRequest(request.id, 'approve')} className="rounded-2xl px-4 py-2 bg-emerald-600 text-white font-semibold shadow-sm">
+                    Approva
+                  </button>
+                  <button onClick={() => startModify(request)} className="rounded-2xl px-4 py-2 bg-sky-600 text-white font-semibold shadow-sm">
+                    Modifica
+                  </button>
+                  <button onClick={() => decideRequest(request.id, 'reject')} className="rounded-2xl px-4 py-2 bg-rose-600 text-white font-semibold shadow-sm">
+                    Rifiuta
+                  </button>
                 </div>
               </div>
               {modifyDraft.requestId === request.id && (
@@ -661,28 +673,45 @@ export default function FantaMasMockup() {
           <Card>
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm text-neutral-600">Ragazzo</label>
-                <select value={operatorTargetUserId} onChange={event => setOperatorTargetUserId(event.target.value)} className="mt-1 w-full rounded-2xl border px-3 py-3 bg-white">
+                <label className="text-sm font-semibold text-neutral-700">Ragazzo</label>
+                <select
+                  value={operatorTargetUserId}
+                  onChange={event => setOperatorTargetUserId(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
+                >
                   {boys.map(user => (
                     <option key={user.id} value={user.id}>{user.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-sm text-neutral-600">Voce</label>
-                <select value={operatorRuleId} onChange={event => setOperatorRuleId(event.target.value)} className="mt-1 w-full rounded-2xl border px-3 py-3 bg-white">
+                <label className="text-sm font-semibold text-neutral-700">Voce</label>
+                <select
+                  value={operatorRuleId}
+                  onChange={event => setOperatorRuleId(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
+                >
                   {operatorRules.map(rule => (
-                    <option key={rule.id} value={rule.id}>{rule.category} — {rule.label} ({rule.points > 0 ? '+' : ''}{rule.points})</option>
+                    <option key={rule.id} value={rule.id}>
+                      {rule.category} — {rule.label} ({rule.points > 0 ? '+' : ''}{rule.points})
+                    </option>
                   ))}
                 </select>
               </div>
             </div>
             <div className="mt-4">
-              <label className="text-sm text-neutral-600">Nota facoltativa</label>
-              <input value={operatorNote} onChange={event => setOperatorNote(event.target.value)} className="mt-1 w-full rounded-2xl border px-3 py-3" placeholder="Es. controllo entrata, comportamento, partecipazione parziale..." />
+              <label className="text-sm font-semibold text-neutral-700">Nota facoltativa</label>
+              <input
+                value={operatorNote}
+                onChange={event => setOperatorNote(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+                placeholder="Es. controllo entrata, comportamento, partecipazione parziale..."
+              />
             </div>
             <div className="mt-6">
-              <button onClick={addManualOperatorEntry} className="rounded-2xl px-5 py-3 bg-slate-900 text-white">Salva movimento</button>
+              <button onClick={addManualOperatorEntry} className="rounded-2xl px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-sm">
+                Salva movimento
+              </button>
             </div>
           </Card>
         </div>
@@ -707,7 +736,7 @@ export default function FantaMasMockup() {
                     {request.decidedBy && <div className="text-xs text-neutral-500 mt-1">Gestito da {request.decidedBy}</div>}
                   </div>
                   <div className="flex items-center gap-3">
-                    <Pill className={STATUS_STYLES[request.status] || 'bg-white'}>{request.status}</Pill>
+                    <Pill className={STATUS_STYLES[request.status] || 'bg-white'}>{getStatusLabel(request)}</Pill>
                     <div className={`font-bold text-lg ${displayedPoints >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                       {displayedPoints > 0 ? '+' : ''}{displayedPoints}
                     </div>
