@@ -1085,7 +1085,7 @@ async function addManualOperatorEntry() {
   if (screen === 'operator-login' && currentUser) {
   return (
     <Shell
-      title="Accesso Operatore"
+      title="ACCESSO OPERATORE TEST"
       subtitle="Inserisci la password per continuare."
       onBack={() => setScreen('landing')}
       currentUser={currentUser}
