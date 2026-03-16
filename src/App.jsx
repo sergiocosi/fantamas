@@ -176,28 +176,28 @@ function runSelfChecks() {
 
 function Shell({ children, title, subtitle, onBack, onReset, currentUser }) {
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-slate-50 text-neutral-900 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <div className="text-3xl md:text-4xl font-bold tracking-tight">FantaMas</div>
-            <div className="text-sm md:text-base text-neutral-600">{subtitle || 'Prima web app demo'}</div>
-            {currentUser && <div className="text-sm mt-1 text-neutral-500">Accesso: {currentUser.name}</div>}
+            <div className="text-4xl md:text-5xl font-black tracking-tight text-orange-600">FantaMas</div>
+            <div className="text-base md:text-lg text-neutral-600 mt-1">{subtitle || 'Prima web app demo'}</div>
+            {currentUser && <div className="text-sm mt-2 text-neutral-500">Accesso: {currentUser.name}</div>}
           </div>
           <div className="flex flex-wrap gap-2">
             {onBack && (
-              <button onClick={onBack} className="rounded-2xl px-4 py-2 bg-white border shadow-sm hover:bg-neutral-100">
+              <button onClick={onBack} className="rounded-2xl px-4 py-2.5 bg-white border border-neutral-200 shadow-sm hover:bg-neutral-100 font-medium">
                 ← Indietro
               </button>
             )}
             {onReset && (
-              <button onClick={onReset} className="rounded-2xl px-4 py-2 bg-white border shadow-sm hover:bg-neutral-100">
+              <button onClick={onReset} className="rounded-2xl px-4 py-2.5 bg-white border border-neutral-200 shadow-sm hover:bg-neutral-100 font-medium">
                 Reset demo
               </button>
             )}
           </div>
         </div>
-        {title && <h1 className="text-2xl font-semibold mb-4">{title}</h1>}
+        {title && <h1 className="text-3xl md:text-4xl font-bold mb-5">{title}</h1>}
         {children}
       </div>
     </div>
@@ -205,7 +205,7 @@ function Shell({ children, title, subtitle, onBack, onReset, currentUser }) {
 }
 
 function Card({ children, className = '' }) {
-  return <div className={`bg-white rounded-3xl shadow-sm border p-5 ${className}`}>{children}</div>;
+  return <div className={`bg-white rounded-[28px] shadow-md border border-neutral-200 p-6 ${className}`}>{children}</div>;
 }
 
 function ActionButton({ children, onClick, className = '', type = 'button' }) {
@@ -213,7 +213,7 @@ function ActionButton({ children, onClick, className = '', type = 'button' }) {
     <button
       type={type}
       onClick={onClick}
-      className={`w-full rounded-3xl px-5 py-4 text-left border shadow-sm bg-white hover:bg-neutral-50 transition ${className}`}
+      className={`w-full rounded-[24px] px-5 py-5 text-left border border-neutral-200 shadow-sm bg-white hover:bg-neutral-50 hover:shadow-md transition font-medium ${className}`}
     >
       {children}
     </button>
@@ -369,16 +369,35 @@ export default function FantaMasMockup() {
 
     return (
       <Shell title="Scegli l’accesso" subtitle="Web app demo con dati salvati in locale." onReset={resetDemo}>
+        <div className="mb-6">
+          <Card className="bg-gradient-to-r from-orange-500 to-amber-400 text-white border-orange-300">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <div className="text-sm uppercase tracking-[0.2em] text-orange-100">MasQueNada</div>
+                <div className="text-3xl md:text-4xl font-black mt-1">Partecipa, aiuta, guadagna punti</div>
+                <p className="mt-3 text-orange-50 max-w-2xl">
+                  Una prima versione semplice per ragazzi e operatori: richieste punti, verifiche, storico e classifica.
+                </p>
+              </div>
+              <div className="rounded-[24px] bg-white/15 backdrop-blur px-5 py-4 min-w-[220px]">
+                <div className="text-sm text-orange-100">Profili demo</div>
+                <div className="text-3xl font-black mt-1">{boys.length + operators.length}</div>
+                <div className="text-sm text-orange-50 mt-1">ragazzi + operatori</div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
         <div className="grid xl:grid-cols-2 gap-6">
           <Card className="bg-orange-50 border-orange-200">
             <div className="text-5xl mb-4">🧑‍🤝‍🧑</div>
-            <div className="text-2xl font-semibold mb-3">Area Ragazzi</div>
-            <p className="text-neutral-700 mb-5">Ogni ragazzo entra con il proprio profilo, invia attività e controlla punti e classifica.</p>
+            <div className="text-2xl font-bold mb-2">Area Ragazzi</div>
+            <p className="text-neutral-700 mb-5 text-base leading-6">Ogni ragazzo entra con il proprio profilo, invia attività e controlla punti e classifica.</p>
             <div className="grid gap-3">
               {boys.map(user => (
                 <ActionButton key={user.id} onClick={() => loginAs(user.id)}>
-                  <div className="font-semibold">Entra come {user.name}</div>
-                  <div className="text-sm text-neutral-600">Profilo ragazzo</div>
+                  <div className="text-lg font-bold">Entra come {user.name}</div>
+                  <div className="text-sm text-neutral-600 mt-1">Profilo ragazzo</div>
                 </ActionButton>
               ))}
             </div>
@@ -386,13 +405,13 @@ export default function FantaMasMockup() {
 
           <Card className="bg-slate-50 border-slate-200">
             <div className="text-5xl mb-4">🧑‍🏫</div>
-            <div className="text-2xl font-semibold mb-3">Area Operatori</div>
-            <p className="text-neutral-700 mb-5">Gli operatori verificano le richieste e possono aggiungere bonus o malus manualmente.</p>
+            <div className="text-2xl font-bold mb-2">Area Operatori</div>
+            <p className="text-neutral-700 mb-5 text-base leading-6">Gli operatori verificano le richieste e possono aggiungere bonus o malus manualmente.</p>
             <div className="grid gap-3">
               {operators.map(user => (
                 <ActionButton key={user.id} onClick={() => loginAs(user.id)} className="bg-slate-900 text-white border-slate-900 hover:bg-slate-800">
-                  <div className="font-semibold">Entra come {user.name}</div>
-                  <div className="text-sm text-slate-300">Profilo operatore</div>
+                  <div className="text-lg font-bold">Entra come {user.name}</div>
+                  <div className="text-sm text-slate-300 mt-1">Profilo operatore</div>
                 </ActionButton>
               ))}
             </div>
@@ -407,9 +426,9 @@ export default function FantaMasMockup() {
       <Shell title={`Ciao, ${currentUser.name}!`} subtitle="Ogni aiuto vale punti." onBack={() => setScreen('landing')} onReset={resetDemo} currentUser={currentUser}>
         <div className="grid lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-1 bg-orange-50 border-orange-200">
-            <div className="text-sm text-neutral-600 mb-2">I tuoi progressi</div>
-            <div className="text-5xl font-bold">{myPoints}</div>
-            <div className="text-neutral-700 mt-2">punti totali</div>
+            <div className="text-sm text-neutral-600 mb-2 uppercase tracking-wider">I tuoi progressi</div>
+            <div className="text-6xl font-black">{myPoints}</div>
+            <div className="text-neutral-700 mt-2 text-lg">punti totali</div>
             <div className="mt-4 flex flex-wrap gap-2">
               <Pill className="bg-white">Posizione: {myPosition || '-'}</Pill>
               <Pill className="bg-white">Richieste in attesa: {myRequests.filter(request => request.status === 'pending').length}</Pill>
