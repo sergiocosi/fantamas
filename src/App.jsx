@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from './supabase';
 
 const STORAGE_KEY = 'fantamas-app-v1';
 
@@ -174,6 +175,66 @@ function runSelfChecks() {
   console.assert(computeLeaderboard(DEFAULT_USERS, DEFAULT_REQUESTS).length >= 1, 'La classifica deve essere calcolabile');
 }
 
+async function loadSupabaseData() {
+  const { data: boysData, error: boysError } = await supabase
+    .from('boys')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  const { data: rulesData, error: rulesError } = await supabase
+    .from('rules')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  const { data: requestsData, error: requestsError } = await supabase
+    .from('requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (boysError || rulesError || requestsError) {
+    console.error('Errore caricamento Supabase', {
+      boysError,
+      rulesError,
+      requestsError,
+    });
+    return;
+  }
+
+  setAppState({
+    users: [
+      ...(boysData || []).map(user => ({
+        id: user.id,
+        name: user.name,
+        role: user.role,
+      })),
+      { id: 'operatore-1', name: 'Operatore', role: 'operator' },
+    ],
+    rules: (rulesData || []).map(rule => ({
+      id: rule.id,
+      category: rule.category,
+      label: rule.label,
+      points: rule.points,
+      kind: rule.kind,
+      boySelectable: rule.boy_selectable,
+      icon: rule.icon,
+      color: rule.color,
+    })),
+    requests: (requestsData || []).map(request => ({
+      id: request.id,
+      userId: request.user_id,
+      userName: request.user_name,
+      ruleId: request.rule_id,
+      activity: request.activity,
+      points: request.points,
+      finalPoints: request.final_points,
+      status: request.status,
+      createdAt: request.created_at,
+      note: request.note || '',
+      decidedBy: request.decided_by || '',
+    })),
+  });
+}
+
 function Shell({ children, title, subtitle, onBack, onReset, currentUser }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-slate-50 text-neutral-900 p-4 md:p-8">
@@ -225,10 +286,10 @@ function Pill({ children, className = '' }) {
 }
 
 export default function FantaMasMockup() {
-  const [appState, setAppState] = useState(() => loadState() || {
-    users: DEFAULT_USERS,
-    rules: DEFAULT_RULES,
-    requests: DEFAULT_REQUESTS,
+  const [appState, setAppState] = useState({
+    users: [],
+    rules: [],
+    requests: [],
   });
   const [screen, setScreen] = useState('landing');
   const [currentUserId, setCurrentUserId] = useState('');
@@ -260,8 +321,72 @@ export default function FantaMasMockup() {
   }, []);
 
   useEffect(() => {
-    saveState(appState);
-  }, [appState]);
+  loadSupabaseData();
+}, []);
+
+  async function loadSupabaseData() {
+  const { data: boysData, error: boysError } = await supabase
+    .from('boys')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  const { data: rulesData, error: rulesError } = await supabase
+    .from('rules')
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  const { data: requestsData, error: requestsError } = await supabase
+    .from('requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (boysError || rulesError || requestsError) {
+    console.error('Errore caricamento Supabase', {
+      boysError,
+      rulesError,
+      requestsError,
+    });
+    return;
+  }
+
+  setAppState({
+    users: [
+      ...(boysData || []).map(user => ({
+        id: user.id,
+        name: user.name,
+        role: user.role,
+      })),
+      { id: 'operatore-1', name: 'Operatore', role: 'operator' },
+    ],
+    rules: (rulesData || []).map(rule => ({
+      id: rule.id,
+      category: rule.category,
+      label: rule.label,
+      points: rule.points,
+      kind: rule.kind,
+      boySelectable: rule.boy_selectable,
+      icon: rule.icon,
+      color: rule.color,
+    })),
+    requests: (requestsData || []).map(request => ({
+      id: request.id,
+      userId: request.user_id,
+      userName: request.user_name,
+      ruleId: request.rule_id,
+      activity: request.activity,
+      points: request.points,
+      finalPoints: request.final_points,
+      status: request.status,
+      createdAt: request.created_at,
+      note: request.note || '',
+      decidedBy: request.decided_by || '',
+    })),
+  });
+}
+
+  // useEffect(() => {
+  //  saveState(appState);
+  // }, [appState]);
 
   useEffect(() => {
   if (!deleteRuleId && appState.rules.length > 0) {
@@ -333,68 +458,103 @@ useEffect(() => {
     setScreen(user.role === 'operator' ? 'operator-home' : 'boy-home');
   }
 
-  function submitRequest() {
-    if (!currentUser || !selectedRule) return;
-    const newRequest = {
-      id: `req-${Date.now()}`,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      ruleId: selectedRule.id,
-      activity: selectedRule.label,
-      points: selectedRule.points,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      note: '',
-      decidedBy: '',
-    };
-    setAppState(previous => ({ ...previous, requests: [newRequest, ...previous.requests] }));
-    setSelectedCategory('');
-    setSelectedRuleId('');
-    setScreen('boy-requests');
+  async function submitRequest() {
+  if (!currentUser || !selectedRule) return;
+
+  const newRequest = {
+    id: `req-${Date.now()}`,
+    user_id: currentUser.id,
+    user_name: currentUser.name,
+    rule_id: selectedRule.id,
+    activity: selectedRule.label,
+    points: selectedRule.points,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+    note: '',
+    decided_by: '',
+  };
+
+  const { error } = await supabase.from('requests').insert(newRequest);
+
+  if (error) {
+    console.error('Errore invio richiesta', error);
+    return;
   }
 
-  function decideRequest(requestId, action) {
-    if (!currentUser) return;
-    setAppState(previous => ({
-      ...previous,
-      requests: previous.requests.map(request => {
-        if (request.id !== requestId || request.status !== 'pending') return request;
-        if (action === 'approve') {
-          return { ...request, status: 'approved', decidedBy: currentUser.name, note: '' };
-        }
-        if (action === 'reject') {
-          return { ...request, status: 'rejected', decidedBy: currentUser.name, note: 'Non confermato' };
-        }
-        return request;
-      }),
-    }));
+  setSelectedCategory('');
+  setSelectedRuleId('');
+  await loadSupabaseData();
+  setScreen('boy-requests');
+}
+
+async function decideRequest(requestId, action) {
+  if (!currentUser) return;
+
+  let payload = null;
+
+  if (action === 'approve') {
+    payload = {
+      status: 'approved',
+      decided_by: currentUser.name,
+      note: '',
+    };
   }
+
+  if (action === 'reject') {
+    payload = {
+      status: 'rejected',
+      decided_by: currentUser.name,
+      note: 'Non confermato',
+    };
+  }
+
+  if (!payload) return;
+
+  const { error } = await supabase
+    .from('requests')
+    .update(payload)
+    .eq('id', requestId)
+    .eq('status', 'pending');
+
+  if (error) {
+    console.error('Errore decisione richiesta', error);
+    return;
+  }
+
+  await loadSupabaseData();
+}
 
   function startModify(request) {
     setModifyDraft({ requestId: request.id, finalPoints: String(Math.max(1, request.points - 1)), note: request.note || 'Partecipazione parziale' });
   }
 
-  function saveModify() {
-    if (!modifyDraft.requestId || !currentUser) return;
-    const parsedPoints = Number(modifyDraft.finalPoints);
-    if (Number.isNaN(parsedPoints)) return;
-    setAppState(previous => ({
-      ...previous,
-      requests: previous.requests.map(request => {
-        if (request.id !== modifyDraft.requestId || request.status !== 'pending') return request;
-        return {
-          ...request,
-          status: 'modified',
-          finalPoints: parsedPoints,
-          note: modifyDraft.note,
-          decidedBy: currentUser.name,
-        };
-      }),
-    }));
-    setModifyDraft({ requestId: '', finalPoints: '', note: '' });
+async function saveModify() {
+  if (!modifyDraft.requestId || !currentUser) return;
+
+  const parsedPoints = Number(modifyDraft.finalPoints);
+  if (Number.isNaN(parsedPoints)) return;
+
+  const { error } = await supabase
+    .from('requests')
+    .update({
+      status: 'modified',
+      final_points: parsedPoints,
+      note: modifyDraft.note,
+      decided_by: currentUser.name,
+    })
+    .eq('id', modifyDraft.requestId)
+    .eq('status', 'pending');
+
+  if (error) {
+    console.error('Errore modifica richiesta', error);
+    return;
   }
 
-  function addNewBoy() {
+  setModifyDraft({ requestId: '', finalPoints: '', note: '' });
+  await loadSupabaseData();
+}
+
+async function addNewBoy() {
   const cleanName = newBoyName.trim();
   if (!cleanName) return;
 
@@ -408,47 +568,48 @@ useEffect(() => {
   const finalId = normalizedId || `ragazzo-${Date.now()}`;
 
   const alreadyExists = appState.users.some(
-    user => user.id === finalId || user.name.toLowerCase() === cleanName.toLowerCase()
+    user => user.role === 'boy' && (user.id === finalId || user.name.toLowerCase() === cleanName.toLowerCase())
   );
 
   if (alreadyExists) return;
 
-  const newUser = {
+  const { error } = await supabase.from('boys').insert({
     id: finalId,
     name: cleanName,
     role: 'boy',
-  };
+  });
 
-  setAppState(previous => ({
-    ...previous,
-    users: [...previous.users, newUser],
-  }));
+  if (error) {
+    console.error('Errore aggiunta ragazzo', error);
+    return;
+  }
 
   setNewBoyName('');
   setOperatorTargetUserId(finalId);
+  await loadSupabaseData();
 }
 
-function deleteBoy() {
+async function deleteBoy() {
   if (!deleteBoyId) return;
 
-  setAppState(previous => {
-    const userToDelete = previous.users.find(user => user.id === deleteBoyId);
-    if (!userToDelete || userToDelete.role !== 'boy') return previous;
+  const userToDelete = appState.users.find(user => user.id === deleteBoyId);
+  if (!userToDelete || userToDelete.role !== 'boy') return;
 
-    const nextUsers = previous.users.filter(user => user.id !== deleteBoyId);
-    const nextRequests = previous.requests.filter(request => request.userId !== deleteBoyId);
+  const { error } = await supabase
+    .from('boys')
+    .delete()
+    .eq('id', deleteBoyId);
 
-    return {
-      ...previous,
-      users: nextUsers,
-      requests: nextRequests,
-    };
-  });
+  if (error) {
+    console.error('Errore eliminazione ragazzo', error);
+    return;
+  }
 
   setDeleteBoyId('');
+  await loadSupabaseData();
 }
 
-function addNewRule() {
+async function addNewRule() {
   const category = newRuleCategory.trim();
   const label = newRuleLabel.trim();
   const points = Number(newRulePoints);
@@ -510,41 +671,45 @@ function addNewRule() {
     label,
     points,
     kind: newRuleKind,
-    boySelectable: newRuleSelectable,
+    boy_selectable: newRuleSelectable,
     icon: matchedIcon ? iconByCategory[matchedIcon] : (newRuleKind === 'malus' ? '⚠️' : '⭐'),
     color: matchedColor ? colorByCategory[matchedColor] : (newRuleKind === 'malus' ? 'rose' : 'orange'),
   };
 
-  setAppState(previous => ({
-    ...previous,
-    rules: [...previous.rules, newRule],
-  }));
+  const { error } = await supabase.from('rules').insert(newRule);
+
+  if (error) {
+    console.error('Errore aggiunta regola', error);
+    return;
+  }
 
   setNewRuleCategory('');
   setNewRuleLabel('');
   setNewRulePoints('');
   setNewRuleKind('bonus');
   setNewRuleSelectable(true);
+
+  await loadSupabaseData();
 }
 
-  function deleteRule() {
+async function deleteRule() {
   if (!deleteRuleId) return;
 
-  setAppState(previous => {
-    const nextRules = previous.rules.filter(rule => rule.id !== deleteRuleId);
-    const nextRequests = previous.requests.filter(request => request.ruleId !== deleteRuleId);
+  const { error } = await supabase
+    .from('rules')
+    .delete()
+    .eq('id', deleteRuleId);
 
-    return {
-      ...previous,
-      rules: nextRules,
-      requests: nextRequests,
-    };
-  });
+  if (error) {
+    console.error('Errore eliminazione regola', error);
+    return;
+  }
 
   setDeleteRuleId('');
+  await loadSupabaseData();
 }
 
-  function updateRule() {
+  async function updateRule() {
   if (!editRuleId) return;
 
   const category = editRuleCategory.trim();
@@ -587,69 +752,92 @@ function addNewRule() {
   const matchedIcon =
     Object.keys(iconByCategory).find(key => categoryKey.includes(key));
 
-  setAppState(previous => ({
-    ...previous,
-    rules: previous.rules.map(rule => {
-      if (rule.id !== editRuleId) return rule;
+  const { error } = await supabase
+    .from('rules')
+    .update({
+      category,
+      label,
+      points,
+      kind: editRuleKind,
+      boy_selectable: editRuleSelectable,
+      icon: matchedIcon ? iconByCategory[matchedIcon] : (editRuleKind === 'malus' ? '⚠️' : '⭐'),
+      color: matchedColor ? colorByCategory[matchedColor] : (editRuleKind === 'malus' ? 'rose' : 'orange'),
+    })
+    .eq('id', editRuleId);
 
-      return {
-        ...rule,
-        category,
-        label,
-        points,
-        kind: editRuleKind,
-        boySelectable: editRuleSelectable,
-        icon: matchedIcon ? iconByCategory[matchedIcon] : (editRuleKind === 'malus' ? '⚠️' : '⭐'),
-        color: matchedColor ? colorByCategory[matchedColor] : (editRuleKind === 'malus' ? 'rose' : 'orange'),
-      };
-    }),
-  }));
+  if (error) {
+    console.error('Errore modifica regola', error);
+    return;
+  }
+
+  await loadSupabaseData();
 }
 
-  function updateBoy() {
-    const cleanName = editBoyName.trim();
-    if (!editBoyId || !cleanName) return;
+async function updateBoy() {
+  const cleanName = editBoyName.trim();
+  if (!editBoyId || !cleanName) return;
 
-    const duplicateName = appState.users.some(
-      user =>
-        user.role === 'boy' &&
-        user.id !== editBoyId &&
-        user.name.toLowerCase() === cleanName.toLowerCase()
-    );
+  const duplicateName = appState.users.some(
+    user =>
+      user.role === 'boy' &&
+      user.id !== editBoyId &&
+      user.name.toLowerCase() === cleanName.toLowerCase()
+  );
 
-    if (duplicateName) return;
+  if (duplicateName) return;
 
-    setAppState(previous => ({
-      ...previous,
-      users: previous.users.map(user =>
-        user.id === editBoyId ? { ...user, name: cleanName } : user
-      ),
-      requests: previous.requests.map(request =>
-        request.userId === editBoyId ? { ...request, userName: cleanName } : request
-      ),
-    }));
+  const { error: boyError } = await supabase
+    .from('boys')
+    .update({ name: cleanName })
+    .eq('id', editBoyId);
+
+  if (boyError) {
+    console.error('Errore modifica ragazzo', boyError);
+    return;
   }
 
-  function addManualOperatorEntry() {
-    const user = appState.users.find(item => item.id === operatorTargetUserId);
-    const rule = appState.rules.find(item => item.id === operatorRuleId);
-    if (!user || !rule || !currentUser) return;
-    const newRequest = {
-      id: `req-${Date.now()}`,
-      userId: user.id,
-      userName: user.name,
-      ruleId: rule.id,
-      activity: rule.label,
-      points: rule.points,
-      status: 'approved',
-      createdAt: new Date().toISOString(),
-      note: operatorNote,
-      decidedBy: currentUser.name,
-    };
-    setAppState(previous => ({ ...previous, requests: [newRequest, ...previous.requests] }));
-    setOperatorNote('');
-    setScreen('operator-history');
+  const { error: requestsError } = await supabase
+    .from('requests')
+    .update({ user_name: cleanName })
+    .eq('user_id', editBoyId);
+
+  if (requestsError) {
+    console.error('Errore aggiornamento richieste del ragazzo', requestsError);
+    return;
   }
+
+  await loadSupabaseData();
+}
+
+async function addManualOperatorEntry() {
+  const user = appState.users.find(item => item.id === operatorTargetUserId);
+  const rule = appState.rules.find(item => item.id === operatorRuleId);
+  if (!user || !rule || !currentUser) return;
+
+  const newRequest = {
+    id: `req-${Date.now()}`,
+    user_id: user.id,
+    user_name: user.name,
+    rule_id: rule.id,
+    activity: rule.label,
+    points: rule.points,
+    status: 'approved',
+    created_at: new Date().toISOString(),
+    note: operatorNote,
+    decided_by: currentUser.name,
+  };
+
+  const { error } = await supabase.from('requests').insert(newRequest);
+
+  if (error) {
+    console.error('Errore inserimento manuale', error);
+    return;
+  }
+
+  setOperatorNote('');
+  await loadSupabaseData();
+  setScreen('operator-history');
+}
 
   if (screen === 'landing') {
     const boys = appState.users.filter(user => user.role === 'boy');
