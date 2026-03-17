@@ -1,0 +1,40 @@
+import Shell from '../ui/Shell';
+import Card from '../ui/Card';
+
+export default function OperatorLoginScreen({
+  currentUser,
+  operatorPasswordInput,
+  setOperatorPasswordInput,
+  submitOperatorPassword,
+  onBack,
+}) {
+  return (
+    <Shell
+      title="Accesso Operatore"
+      subtitle="Inserisci la password per continuare."
+      onBack={onBack}
+      currentUser={currentUser}
+    >
+      <div className="max-w-xl">
+        <Card>
+          <div className="text-lg font-bold mb-3">Password operatore</div>
+          <input
+            type="password"
+            value={operatorPasswordInput}
+            onChange={event => setOperatorPasswordInput(event.target.value)}
+            className="w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+            placeholder="Inserisci la password"
+          />
+          <div className="mt-4">
+            <button
+              onClick={submitOperatorPassword}
+              className="rounded-2xl px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-sm"
+            >
+              Entra
+            </button>
+          </div>
+        </Card>
+      </div>
+    </Shell>
+  );
+}

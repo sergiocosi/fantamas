@@ -1,3 +1,5 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from './supabase';
 import {
   DEFAULT_USERS,
   DEFAULT_RULES,
@@ -11,142 +13,13 @@ import {
   computeLeaderboard,
   runSelfChecks,
 } from './utils/appHelpers';
-import React, { useEffect, useMemo, useState } from 'react';
-import { supabase } from './supabase';
 
-const STORAGE_KEY = 'fantamas-app-v1';
-
-function loadState() {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.users) || !Array.isArray(parsed.rules) || !Array.isArray(parsed.requests)) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function saveState(state) {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // ignore storage errors in preview environments
-  }
-}
-
-async function loadSupabaseData() {
-  const { data: boysData, error: boysError } = await supabase
-    .from('boys')
-    .select('*')
-    .order('created_at', { ascending: true });
-
-  const { data: rulesData, error: rulesError } = await supabase
-    .from('rules')
-    .select('*')
-    .order('created_at', { ascending: true });
-
-  const { data: requestsData, error: requestsError } = await supabase
-    .from('requests')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (boysError || rulesError || requestsError) {
-    console.error('Errore caricamento Supabase', {
-      boysError,
-      rulesError,
-      requestsError,
-    });
-    return;
-  }
-
-  setAppState({
-    users: [
-      ...(boysData || []).map(user => ({
-        id: user.id,
-        name: user.name,
-        role: user.role,
-      })),
-      { id: 'operatore-1', name: 'Operatore', role: 'operator' },
-    ],
-    rules: (rulesData || []).map(rule => ({
-      id: rule.id,
-      category: rule.category,
-      label: rule.label,
-      points: rule.points,
-      kind: rule.kind,
-      boySelectable: rule.boy_selectable,
-      icon: rule.icon,
-      color: rule.color,
-    })),
-    requests: (requestsData || []).map(request => ({
-      id: request.id,
-      userId: request.user_id,
-      userName: request.user_name,
-      ruleId: request.rule_id,
-      activity: request.activity,
-      points: request.points,
-      finalPoints: request.final_points,
-      status: request.status,
-      createdAt: request.created_at,
-      note: request.note || '',
-      decidedBy: request.decided_by || '',
-    })),
-  });
-}
-
-function Shell({ children, title, subtitle, onBack, onReset, currentUser }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-slate-50 text-neutral-900 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <div className="text-4xl md:text-5xl font-black tracking-tight text-orange-600">FantaMas</div>
-            <div className="text-base md:text-lg text-neutral-600 mt-1">{subtitle || 'Prima web app demo'}</div>
-            {currentUser && <div className="text-sm mt-2 text-neutral-500">Accesso: {currentUser.name}</div>}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {onBack && (
-              <button onClick={onBack} className="rounded-2xl px-4 py-2.5 bg-white border border-neutral-200 shadow-sm hover:bg-neutral-100 font-medium">
-                ← Indietro
-              </button>
-            )}
-            {onReset && (
-              <button onClick={onReset} className="rounded-2xl px-4 py-2.5 bg-white border border-neutral-200 shadow-sm hover:bg-neutral-100 font-medium">
-                Reset demo
-              </button>
-            )}
-          </div>
-        </div>
-        {title && <h1 className="text-3xl md:text-4xl font-bold mb-5">{title}</h1>}
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Card({ children, className = '' }) {
-  return <div className={`bg-white rounded-[28px] shadow-md border border-neutral-200 p-6 ${className}`}>{children}</div>;
-}
-
-function ActionButton({ children, onClick, className = '', type = 'button' }) {
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      className={`w-full rounded-[24px] px-5 py-5 text-left border border-neutral-200 shadow-sm bg-white hover:bg-neutral-50 hover:shadow-md transition font-medium ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Pill({ children, className = '' }) {
-  return <div className={`inline-flex rounded-full px-3 py-1 text-sm font-medium border ${className}`}>{children}</div>;
-}
+import LandingScreen from './components/screens/LandingScreen';
+import OperatorLoginScreen from './components/screens/OperatorLoginScreen';
+import Shell from './components/ui/Shell';
+import Card from './components/ui/Card';
+import ActionButton from './components/ui/ActionButton';
+import Pill from './components/ui/Pill';
 
 const OPERATOR_PASSWORD = import.meta.env.VITE_OPERATOR_PASSWORD;
 
@@ -315,7 +188,6 @@ useEffect(() => {
     setOperatorRuleId('rifiuto-partecipare');
     setOperatorNote('');
     setModifyDraft({ requestId: '', finalPoints: '', note: '' });
-    saveState(fresh);
   }
 
 function loginAs(userId) {
@@ -731,63 +603,15 @@ async function addManualOperatorEntry() {
   setScreen('operator-history');
 }
 
-  if (screen === 'landing') {
-    const boys = appState.users.filter(user => user.role === 'boy');
-    const operators = appState.users.filter(user => user.role === 'operator');
-
-    return (
-      <Shell title="Scegli l’accesso" subtitle="Web app demo con dati salvati in locale." onReset={resetDemo}>
-        <div className="mb-6">
-          <Card className="bg-gradient-to-r from-orange-500 to-amber-400 text-white border-orange-300">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div>
-                <div className="text-sm uppercase tracking-[0.2em] text-orange-100">MasQueNada</div>
-                <div className="text-3xl md:text-4xl font-black mt-1">Partecipa, aiuta, guadagna punti</div>
-                <p className="mt-3 text-orange-50 max-w-2xl">
-                  Una prima versione semplice per ragazzi e operatori: richieste punti, verifiche, storico e classifica.
-                </p>
-              </div>
-              <div className="rounded-[24px] bg-white/15 backdrop-blur px-5 py-4 min-w-[220px]">
-                <div className="text-sm text-orange-100">Profili demo</div>
-                <div className="text-3xl font-black mt-1">{boys.length + operators.length}</div>
-                <div className="text-sm text-orange-50 mt-1">ragazzi + operatori</div>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        <div className="grid xl:grid-cols-2 gap-6">
-          <Card className="bg-orange-50 border-orange-200">
-            <div className="text-5xl mb-4">🧑‍🤝‍🧑</div>
-            <div className="text-2xl font-bold mb-2">Area Ragazzi</div>
-            <p className="text-neutral-700 mb-5 text-base leading-6">Ogni ragazzo entra con il proprio profilo, invia attività e controlla punti e classifica.</p>
-            <div className="grid gap-3">
-              {boys.map(user => (
-                <ActionButton key={user.id} onClick={() => loginAs(user.id)}>
-                  <div className="text-lg font-bold">Entra come {user.name}</div>
-                  <div className="text-sm text-neutral-600 mt-1">Profilo ragazzo</div>
-                </ActionButton>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="bg-slate-50 border-slate-200">
-            <div className="text-5xl mb-4">🧑‍🏫</div>
-            <div className="text-2xl font-bold mb-2">Area Operatori</div>
-            <p className="text-neutral-700 mb-5 text-base leading-6">Gli operatori verificano le richieste e possono aggiungere bonus o malus manualmente.</p>
-            <div className="grid gap-3">
-              {operators.map(user => (
-                <ActionButton key={user.id} onClick={() => loginAs(user.id)} className="bg-slate-900 text-white border-slate-900 hover:bg-slate-800">
-                  <div className="text-lg font-bold">Entra come {user.name}</div>
-                  <div className="text-sm text-slate-300 mt-1">Profilo operatore</div>
-                </ActionButton>
-              ))}
-            </div>
-          </Card>
-        </div>
-      </Shell>
-    );
-  }
+if (screen === 'landing') {
+  return (
+    <LandingScreen
+      users={appState.users}
+      loginAs={loginAs}
+      resetDemo={resetDemo}
+    />
+  );
+}
 
   if (screen === 'boy-home' && currentUser) {
     return (
@@ -945,35 +769,15 @@ async function addManualOperatorEntry() {
     );
   }
 
-  if (screen === 'operator-login' && currentUser) {
+if (screen === 'operator-login' && currentUser) {
   return (
-    <Shell
-      title="Accesso Operatore"
-      subtitle="Inserisci la password per continuare."
-      onBack={() => setScreen('landing')}
+    <OperatorLoginScreen
       currentUser={currentUser}
-    >
-      <div className="max-w-xl">
-        <Card>
-          <div className="text-lg font-bold mb-3">Password operatore</div>
-          <input
-            type="password"
-            value={operatorPasswordInput}
-            onChange={event => setOperatorPasswordInput(event.target.value)}
-            className="w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
-            placeholder="Inserisci la password"
-          />
-          <div className="mt-4">
-            <button
-              onClick={submitOperatorPassword}
-              className="rounded-2xl px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-sm"
-            >
-              Entra
-            </button>
-          </div>
-        </Card>
-      </div>
-    </Shell>
+      operatorPasswordInput={operatorPasswordInput}
+      setOperatorPasswordInput={setOperatorPasswordInput}
+      submitOperatorPassword={submitOperatorPassword}
+      onBack={() => setScreen('landing')}
+    />
   );
 }
 
