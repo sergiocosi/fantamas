@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from './supabase';
 import {
-  DEFAULT_USERS,
-  DEFAULT_RULES,
-  DEFAULT_REQUESTS,
   COLOR_STYLES,
   STATUS_STYLES,
   formatDate,
@@ -16,10 +13,18 @@ import {
 
 import LandingScreen from './components/screens/LandingScreen';
 import OperatorLoginScreen from './components/screens/OperatorLoginScreen';
-import Shell from './components/ui/Shell';
-import Card from './components/ui/Card';
-import ActionButton from './components/ui/ActionButton';
-import Pill from './components/ui/Pill';
+import OperatorHomeScreen from './components/screens/OperatorHomeScreen';
+import OperatorHistoryScreen from './components/screens/OperatorHistoryScreen';
+import OperatorRequestsScreen from './components/screens/OperatorRequestsScreen';
+import OperatorManualScreen from './components/screens/OperatorManualScreen';
+import BoyHomeScreen from './components/screens/BoyHomeScreen';
+import BoyRequestsScreen from './components/screens/BoyRequestsScreen';
+import BoyLeaderboardScreen from './components/screens/BoyLeaderboardScreen';
+import BoyCategoriesScreen from './components/screens/BoyCategoriesScreen';
+import BoyItemsScreen from './components/screens/BoyItemsScreen';
+import BoyConfirmScreen from './components/screens/BoyConfirmScreen';
+import BoyLoginScreen from './components/screens/BoyLoginScreen';
+import BoyChangePasswordScreen from './components/screens/BoyChangePasswordScreen';
 
 const OPERATOR_PASSWORD = import.meta.env.VITE_OPERATOR_PASSWORD;
 
@@ -37,6 +42,13 @@ export default function FantaMasMockup() {
   const [operatorRuleId, setOperatorRuleId] = useState('rifiuto-partecipare');
   const [operatorNote, setOperatorNote] = useState('');
   const [newBoyName, setNewBoyName] = useState('');
+  const [boyPasswordInput, setBoyPasswordInput] = useState('');
+  const [boyAccessGranted, setBoyAccessGranted] = useState(false);
+  const [passwordBoyId, setPasswordBoyId] = useState('');
+  const [newBoyPassword, setNewBoyPassword] = useState('');
+  const [currentBoyPasswordInput, setCurrentBoyPasswordInput] = useState('');
+  const [newBoyPasswordInput, setNewBoyPasswordInput] = useState('');
+  const [confirmBoyPasswordInput, setConfirmBoyPasswordInput] = useState('');
   const [newRuleCategory, setNewRuleCategory] = useState('');
   const [newRuleLabel, setNewRuleLabel] = useState('');
   const [newRulePoints, setNewRulePoints] = useState('');
@@ -95,6 +107,7 @@ export default function FantaMasMockup() {
         id: user.id,
         name: user.name,
         role: user.role,
+        password: user.password || '',
       })),
       { id: 'operatore-1', name: 'Operatore', role: 'operator' },
     ],
@@ -127,6 +140,14 @@ export default function FantaMasMockup() {
   // useEffect(() => {
   //  saveState(appState);
   // }, [appState]);
+
+  useEffect(() => {
+  const boys = appState.users.filter(user => user.role === 'boy');
+
+  if (!passwordBoyId && boys.length > 0) {
+    setPasswordBoyId(boys[0].id);
+  }
+}, [appState.users, passwordBoyId]);
 
   useEffect(() => {
   if (!deleteRuleId && appState.rules.length > 0) {
@@ -170,38 +191,25 @@ useEffect(() => {
   const selectedRule = appState.rules.find(rule => rule.id === selectedRuleId) || null;
   const leaderboard = useMemo(() => computeLeaderboard(appState.users, appState.requests), [appState.users, appState.requests]);
   const pendingRequests = useMemo(() => appState.requests.filter(request => request.status === 'pending'), [appState.requests]);
-  const myRequests = useMemo(
-    () => appState.requests.filter(request => request.userId === currentUserId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
-    [appState.requests, currentUserId]
-  );
+  const myRequests = useMemo(() => appState.requests.filter(request => request.userId === currentUserId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)), [appState.requests, currentUserId]);
   const myPoints = useMemo(() => leaderboard.find(item => item.id === currentUserId)?.points || 0, [leaderboard, currentUserId]);
   const myPosition = useMemo(() => leaderboard.findIndex(item => item.id === currentUserId) + 1 || 0, [leaderboard, currentUserId]);
-
-  function resetDemo() {
-    const fresh = { users: DEFAULT_USERS, rules: DEFAULT_RULES, requests: DEFAULT_REQUESTS };
-    setAppState(fresh);
-    setScreen('landing');
-    setCurrentUserId('');
-    setSelectedCategory('');
-    setSelectedRuleId('');
-    setOperatorTargetUserId('marco');
-    setOperatorRuleId('rifiuto-partecipare');
-    setOperatorNote('');
-    setModifyDraft({ requestId: '', finalPoints: '', note: '' });
-  }
+  const history = useMemo(() => [...appState.requests].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)), [appState.requests]);
 
 function loginAs(userId) {
   const user = appState.users.find(item => item.id === userId);
   if (!user) return;
 
+  setCurrentUserId(userId);
+
   if (user.role === 'operator') {
-    setCurrentUserId(userId);
     setScreen('operator-login');
     return;
   }
 
-  setCurrentUserId(userId);
-  setScreen('boy-home');
+  setBoyPasswordInput('');
+  setBoyAccessGranted(false);
+  setScreen('boy-login');
 }
 
 function submitOperatorPassword() {
@@ -220,6 +228,89 @@ function logoutOperator() {
   setOperatorPasswordInput('');
   setCurrentUserId('');
   setScreen('landing');
+}
+
+function submitBoyPassword() {
+  const user = appState.users.find(item => item.id === currentUserId && item.role === 'boy');
+  if (!user) return;
+
+  if (boyPasswordInput.trim() === String(user.password || '').trim()) {
+    setBoyAccessGranted(true);
+    setBoyPasswordInput('');
+    setScreen('boy-home');
+    return;
+  }
+
+  alert('Password ragazzo non corretta');
+}
+
+function logoutBoy() {
+  setBoyAccessGranted(false);
+  setBoyPasswordInput('');
+  setCurrentBoyPasswordInput('');
+  setNewBoyPasswordInput('');
+  setConfirmBoyPasswordInput('');
+  setCurrentUserId('');
+  setScreen('landing');
+}
+
+  async function changeBoyPassword() {
+  const user = appState.users.find(item => item.id === currentUserId && item.role === 'boy');
+  if (!user) return;
+
+  const currentPassword = currentBoyPasswordInput.trim();
+  const nextPassword = newBoyPasswordInput.trim();
+  const confirmPassword = confirmBoyPasswordInput.trim();
+
+  if (currentPassword !== String(user.password || '').trim()) {
+    alert('Password attuale non corretta');
+    return;
+  }
+
+  if (!nextPassword) {
+    alert('Inserisci una nuova password');
+    return;
+  }
+
+  if (nextPassword !== confirmPassword) {
+    alert('Le nuove password non coincidono');
+    return;
+  }
+
+  const { error } = await supabase
+    .from('boys')
+    .update({ password: nextPassword })
+    .eq('id', user.id);
+
+  if (error) {
+    console.error('Errore cambio password ragazzo', error);
+    return;
+  }
+
+  setCurrentBoyPasswordInput('');
+  setNewBoyPasswordInput('');
+  setConfirmBoyPasswordInput('');
+  await loadSupabaseData();
+  alert('Password aggiornata');
+  setScreen('boy-home');
+}
+
+async function updateBoyPassword() {
+  const cleanPassword = newBoyPassword.trim();
+  if (!passwordBoyId || !cleanPassword) return;
+
+  const { error } = await supabase
+    .from('boys')
+    .update({ password: cleanPassword })
+    .eq('id', passwordBoyId);
+
+  if (error) {
+    console.error('Errore modifica password ragazzo', error);
+    return;
+  }
+
+  setNewBoyPassword('');
+  await loadSupabaseData();
 }
 
   async function submitRequest() {
@@ -341,6 +432,7 @@ async function addNewBoy() {
     id: finalId,
     name: cleanName,
     role: 'boy',
+    password: '1234',
   });
 
   if (error) {
@@ -376,9 +468,11 @@ async function deleteBoy() {
 async function addNewRule() {
   const category = newRuleCategory.trim();
   const label = newRuleLabel.trim();
-  const points = Number(newRulePoints);
+  const rawPoints = Number(newRulePoints);
 
-  if (!category || !label || Number.isNaN(points)) return;
+  if (!category || !label || Number.isNaN(rawPoints)) return;
+
+  const points = newRuleKind === 'malus' ? -Math.abs(rawPoints) : Math.abs(rawPoints);
 
   const normalizedId = `${category}-${label}`
     .toLowerCase()
@@ -478,9 +572,11 @@ async function deleteRule() {
 
   const category = editRuleCategory.trim();
   const label = editRuleLabel.trim();
-  const points = Number(editRulePoints);
+  const rawPoints = Number(editRulePoints);
 
-  if (!category || !label || Number.isNaN(points)) return;
+  if (!category || !label || Number.isNaN(rawPoints)) return;
+
+  const points = editRuleKind === 'malus' ? -Math.abs(rawPoints) : Math.abs(rawPoints);
 
   const colorByCategory = {
     pulizia: 'sky',
@@ -531,6 +627,25 @@ async function deleteRule() {
 
   if (error) {
     console.error('Errore modifica regola', error);
+    return;
+  }
+
+  await loadSupabaseData();
+}
+
+async function deleteRequest(requestId) {
+  if (!requestId) return;
+
+  const confirmed = window.confirm('Vuoi davvero eliminare questo movimento?');
+  if (!confirmed) return;
+
+  const { error } = await supabase
+    .from('requests')
+    .delete()
+    .eq('id', requestId);
+
+  if (error) {
+    console.error('Errore eliminazione movimento', error);
     return;
   }
 
@@ -608,166 +723,136 @@ if (screen === 'landing') {
     <LandingScreen
       users={appState.users}
       loginAs={loginAs}
-      resetDemo={resetDemo}
     />
   );
 }
 
-  if (screen === 'boy-home' && currentUser) {
-    return (
-      <Shell title={`Ciao, ${currentUser.name}!`} subtitle="Ogni aiuto vale punti." onBack={() => setScreen('landing')} onReset={resetDemo} currentUser={currentUser}>
-        <div className="grid lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-1 bg-orange-50 border-orange-200">
-            <div className="text-sm text-neutral-600 mb-2 uppercase tracking-wider">I tuoi progressi</div>
-            <div className="text-6xl font-black">{myPoints}</div>
-            <div className="text-neutral-700 mt-2 text-lg">punti totali</div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Pill className="bg-white">Posizione: {myPosition || '-'}</Pill>
-              <Pill className="bg-white">Richieste in attesa: {myRequests.filter(request => request.status === 'pending').length}</Pill>
-            </div>
-          </Card>
+if (screen === 'boy-login' && currentUser) {
+  return (
+    <BoyLoginScreen
+      currentUser={currentUser}
+      boyPasswordInput={boyPasswordInput}
+      setBoyPasswordInput={setBoyPasswordInput}
+      submitBoyPassword={submitBoyPassword}
+      onBack={() => {
+        setBoyPasswordInput('');
+        setCurrentUserId('');
+        setScreen('landing');
+      }}
+    />
+  );
+}
 
-          <div className="lg:col-span-2 grid sm:grid-cols-3 gap-4">
-            <ActionButton onClick={() => setScreen('boy-categories')} className="border-orange-200 bg-orange-50 hover:bg-orange-100">
-              <div className="text-3xl mb-2">➕</div>
-              <div className="font-bold">Aggiungi attività</div>
-              <div className="text-sm text-neutral-600">Invia una richiesta punti</div>
-            </ActionButton>
-            <ActionButton onClick={() => setScreen('boy-leaderboard')} className="border-amber-200 bg-amber-50 hover:bg-amber-100">
-              <div className="text-3xl mb-2">🏆</div>
-              <div className="font-bold">Classifica</div>
-              <div className="text-sm text-neutral-600">Guarda il gruppo</div>
-            </ActionButton>
-            <ActionButton onClick={() => setScreen('boy-requests')} className="border-sky-200 bg-sky-50 hover:bg-sky-100">
-              <div className="text-3xl mb-2">📋</div>
-              <div className="font-bold">Le mie richieste</div>
-              <div className="text-sm text-neutral-600">Controlla lo stato</div>
-            </ActionButton>
-          </div>
-        </div>
-      </Shell>
-    );
-  }
+if (screen === 'boy-home' && currentUser && boyAccessGranted) {
+  return (
+    <BoyHomeScreen
+      currentUser={currentUser}
+      myPoints={myPoints}
+      myPosition={myPosition}
+      myRequests={myRequests}
+      goBack={logoutBoy}
+      goToCategories={() => setScreen('boy-categories')}
+      goToLeaderboard={() => setScreen('boy-leaderboard')}
+      goToRequests={() => setScreen('boy-requests')}
+      goToChangePassword={() => setScreen('boy-change-password')}
+    />
+  );
+}
 
-  if (screen === 'boy-categories' && currentUser) {
-    return (
-      <Shell title="Scegli attività" subtitle="Tocca una categoria per continuare." onBack={() => setScreen('boy-home')} onReset={resetDemo} currentUser={currentUser}>
-        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {categories.map(category => (
-            <button
-              key={category.key}
-              type="button"
-              onClick={() => {
-                setSelectedCategory(category.key);
-                setScreen('boy-items');
-              }}
-              className={`rounded-3xl border p-5 text-left shadow-sm hover:scale-[1.01] transition ${COLOR_STYLES[category.color] || ''}`}
-            >
-              <div className="text-4xl mb-3">{category.icon}</div>
-              <div className="text-xl font-semibold">{category.label}</div>
-              <div className="text-sm opacity-80 mt-1">{category.items.length} attività</div>
-            </button>
-          ))}
-        </div>
-      </Shell>
-    );
-  }
+if (screen === 'boy-categories' && currentUser && boyAccessGranted) {
+  return (
+    <BoyCategoriesScreen
+      currentUser={currentUser}
+      categories={categories}
+      colorStyles={COLOR_STYLES}
+      goBack={() => setScreen('boy-home')}
+      onSelectCategory={(categoryKey) => {
+        setSelectedCategory(categoryKey);
+        setScreen('boy-items');
+      }}
+    />
+  );
+}
 
-  if (screen === 'boy-items' && currentUser && selectedCategoryData) {
-    return (
-      <Shell title={selectedCategoryData.label} subtitle="Scegli cosa hai fatto." onBack={() => setScreen('boy-categories')} onReset={resetDemo} currentUser={currentUser}>
-        <div className="grid gap-3 max-w-4xl">
-          {selectedCategoryData.items.map(rule => (
-            <ActionButton
-              key={rule.id}
-              onClick={() => {
-                setSelectedRuleId(rule.id);
-                setScreen('boy-confirm');
-              }}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="font-semibold">{rule.label}</div>
-                  <div className="text-sm text-neutral-600">Richiesta da confermare dall’operatore</div>
-                </div>
-                <Pill className="bg-emerald-100 border-emerald-200 text-emerald-800">+{rule.points}</Pill>
-              </div>
-            </ActionButton>
-          ))}
-        </div>
-      </Shell>
-    );
-  }
+if (screen === 'boy-items' && currentUser && selectedCategoryData && boyAccessGranted) {
+  return (
+    <BoyItemsScreen
+      currentUser={currentUser}
+      selectedCategoryData={selectedCategoryData}
+      goBack={() => setScreen('boy-categories')}
+      onSelectRule={(ruleId) => {
+        setSelectedRuleId(ruleId);
+        setScreen('boy-confirm');
+      }}
+    />
+  );
+}
 
-  if (screen === 'boy-confirm' && currentUser && selectedRule) {
-    return (
-      <Shell title="Conferma richiesta" subtitle="Controlla e invia." onBack={() => setScreen('boy-items')} onReset={resetDemo} currentUser={currentUser}>
-        <div className="max-w-2xl">
-          <Card>
-            <div className="text-sm text-neutral-500">Attività selezionata</div>
-            <div className="text-2xl font-semibold mt-1">{selectedRule.label}</div>
-            <div className="mt-4 inline-flex rounded-full bg-emerald-100 text-emerald-800 px-4 py-2 font-semibold border border-emerald-200">
-              Punti previsti: {selectedRule.points > 0 ? '+' : ''}{selectedRule.points}
-            </div>
-            <div className="mt-6 grid sm:grid-cols-2 gap-3">
-              <ActionButton onClick={submitRequest} className="bg-orange-500 text-white border-orange-500 hover:bg-orange-600">
-                Invia richiesta
-              </ActionButton>
-              <ActionButton onClick={() => setScreen('boy-items')}>Annulla</ActionButton>
-            </div>
-          </Card>
-        </div>
-      </Shell>
-    );
-  }
+if (screen === 'boy-confirm' && currentUser && selectedRule && boyAccessGranted) {
+  return (
+    <BoyConfirmScreen
+      currentUser={currentUser}
+      selectedRule={selectedRule}
+      goBack={() => setScreen('boy-items')}
+      onSubmitRequest={submitRequest}
+    />
+  );
+}
 
-  if (screen === 'boy-requests' && currentUser) {
-    return (
-      <Shell title="Le mie richieste" subtitle="Stato delle attività inviate." onBack={() => setScreen('boy-home')} onReset={resetDemo} currentUser={currentUser}>
-        <div className="grid gap-3 max-w-4xl">
-          {myRequests.length === 0 && <Card>Nessuna richiesta inviata.</Card>}
-          {myRequests.map(request => (
-            <Card key={request.id} className={STATUS_STYLES[request.status] || ''}>
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                <div>
-                  <div className="font-bold text-lg">{request.activity}</div>
-                  <div className="text-sm opacity-80 mt-1">{formatDate(request.createdAt)}</div>
-                  {request.note && <div className="text-sm mt-2">Nota: {request.note}</div>}
-                </div>
-                <div className="flex flex-col items-start md:items-end gap-2">
-                  <Pill className={STATUS_STYLES[request.status] || 'bg-white'}>{getStatusLabel(request)}</Pill>
-                  {request.decidedBy && <div className="text-xs opacity-70">da {request.decidedBy}</div>}
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </Shell>
-    );
-  }
+if (screen === 'boy-requests' && currentUser && boyAccessGranted) {
+  return (
+    <BoyRequestsScreen
+      currentUser={currentUser}
+      myRequests={myRequests}
+      goBack={() => setScreen('boy-home')}
+      statusStyles={STATUS_STYLES}
+      formatDate={formatDate}
+      getStatusLabel={getStatusLabel}
+    />
+  );
+}
 
-  if (screen === 'boy-leaderboard' && currentUser) {
-    return (
-      <Shell title="Classifica" subtitle="Punteggio totale demo." onBack={() => setScreen('boy-home')} onReset={resetDemo} currentUser={currentUser}>
-        <div className="max-w-4xl grid gap-3">
-          {leaderboard.map((item, index) => (
-            <Card key={item.id} className={item.id === currentUser.id ? 'border-orange-300 bg-orange-50 shadow-lg' : ''}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-neutral-900 text-white flex items-center justify-center font-black text-lg">{index + 1}</div>
-                  <div>
-                    <div className="font-semibold">{item.name}</div>
-                    {item.id === currentUser.id && <div className="text-sm text-neutral-600">Questo sei tu</div>}
-                  </div>
-                </div>
-                <div className="text-2xl font-black text-orange-600">{item.points}</div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </Shell>
-    );
-  }
+if (screen === 'boy-leaderboard' && currentUser && boyAccessGranted) {
+  return (
+    <BoyLeaderboardScreen
+      currentUser={currentUser}
+      leaderboard={leaderboard}
+      goBack={() => setScreen('boy-home')}
+    />
+  );
+}
+
+if (screen === 'boy-home' && currentUser && boyAccessGranted) {
+  return (
+    <BoyHomeScreen
+      currentUser={currentUser}
+      myPoints={myPoints}
+      myPosition={myPosition}
+      myRequests={myRequests}
+      goBack={logoutBoy}
+      goToCategories={() => setScreen('boy-categories')}
+      goToLeaderboard={() => setScreen('boy-leaderboard')}
+      goToRequests={() => setScreen('boy-requests')}
+      goToChangePassword={() => setScreen('boy-change-password')}
+    />
+  );
+}
+
+if (screen === 'boy-change-password' && currentUser && boyAccessGranted) {
+  return (
+    <BoyChangePasswordScreen
+      currentUser={currentUser}
+      currentBoyPasswordInput={currentBoyPasswordInput}
+      setCurrentBoyPasswordInput={setCurrentBoyPasswordInput}
+      newBoyPasswordInput={newBoyPasswordInput}
+      setNewBoyPasswordInput={setNewBoyPasswordInput}
+      confirmBoyPasswordInput={confirmBoyPasswordInput}
+      setConfirmBoyPasswordInput={setConfirmBoyPasswordInput}
+      changeBoyPassword={changeBoyPassword}
+      goBack={() => setScreen('boy-home')}
+    />
+  );
+}
 
 if (screen === 'operator-login' && currentUser) {
   return (
@@ -781,437 +866,110 @@ if (screen === 'operator-login' && currentUser) {
   );
 }
 
-  if (screen === 'operator-home' && currentUser && operatorAccessGranted) {
-    return (
-      <Shell title="Area Operatori" subtitle="Controllo rapido delle attività." onBack={logoutOperator} onReset={resetDemo} currentUser={currentUser}>
-        <div className="grid lg:grid-cols-4 gap-4">
-          <Card className="bg-slate-900 text-white lg:col-span-1">
-            <div className="text-sm text-slate-300 uppercase tracking-wider">Richieste in attesa</div>
-            <div className="text-6xl font-black mt-2">{pendingRequests.length}</div>
-            <div className="text-sm text-slate-300 mt-2">Da controllare adesso</div>
-          </Card>
-          <ActionButton onClick={() => setScreen('operator-requests')}>
-            <div className="text-3xl mb-2">✅</div>
-            <div className="font-semibold">Verifica richieste</div>
-            <div className="text-sm text-neutral-600">Approva, modifica o rifiuta</div>
-          </ActionButton>
-          <ActionButton onClick={() => setScreen('operator-manual')}>
-            <div className="text-3xl mb-2">✍️</div>
-            <div className="font-semibold">Aggiungi bonus / malus</div>
-            <div className="text-sm text-neutral-600">Inserimento manuale</div>
-          </ActionButton>
-          <ActionButton onClick={() => setScreen('operator-history')}>
-            <div className="text-3xl mb-2">🕘</div>
-            <div className="font-semibold">Storico</div>
-            <div className="text-sm text-neutral-600">Tutti i movimenti</div>
-          </ActionButton>
-        </div>
-      </Shell>
-    );
-  }
+if (screen === 'operator-home' && currentUser && operatorAccessGranted) {
+  return (
+    <OperatorHomeScreen
+      currentUser={currentUser}
+      pendingRequests={pendingRequests}
+      onLogout={logoutOperator}
+      goToRequests={() => setScreen('operator-requests')}
+      goToManual={() => setScreen('operator-manual')}
+      goToHistory={() => setScreen('operator-history')}
+    />
+  );
+}
 
-  if (screen === 'operator-requests' && currentUser && operatorAccessGranted) {
-    return (
-      <Shell title="Richieste da verificare" subtitle="Conferma le attività inviate dai ragazzi." onBack={() => setScreen('operator-home')} onReset={resetDemo} currentUser={currentUser}>
-        <div className="grid gap-3">
-          {pendingRequests.length === 0 && <Card>Nessuna richiesta in attesa.</Card>}
-          {pendingRequests.map(request => (
-            <Card key={request.id}>
-              <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <Pill className="bg-orange-50 border-orange-200 text-orange-700">{request.userName}</Pill>
-                    <Pill className="bg-emerald-50 border-emerald-200 text-emerald-700">
-                      {request.points > 0 ? '+' : ''}{request.points} punti
-                    </Pill>
-                  </div>
-                  <div className="text-xl font-bold">{request.activity}</div>
-                  <div className="text-sm text-neutral-600 mt-1">{formatDate(request.createdAt)}</div>
-                </div>
-                <div className="flex flex-wrap gap-2 xl:max-w-md">
-                  <button onClick={() => decideRequest(request.id, 'approve')} className="rounded-2xl px-4 py-2 bg-emerald-600 text-white font-semibold shadow-sm">
-                    Approva
-                  </button>
-                  <button onClick={() => startModify(request)} className="rounded-2xl px-4 py-2 bg-sky-600 text-white font-semibold shadow-sm">
-                    Modifica
-                  </button>
-                  <button onClick={() => decideRequest(request.id, 'reject')} className="rounded-2xl px-4 py-2 bg-rose-600 text-white font-semibold shadow-sm">
-                    Rifiuta
-                  </button>
-                </div>
-              </div>
-              {modifyDraft.requestId === request.id && (
-                <div className="mt-4 border-t pt-4 grid md:grid-cols-[140px_1fr_auto] gap-3 items-end">
-                  <div>
-                    <label className="text-sm text-neutral-600">Punti finali</label>
-                    <input
-                      value={modifyDraft.finalPoints}
-                      onChange={event => setModifyDraft(previous => ({ ...previous, finalPoints: event.target.value }))}
-                      className="mt-1 w-full rounded-2xl border px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-neutral-600">Nota</label>
-                    <input
-                      value={modifyDraft.note}
-                      onChange={event => setModifyDraft(previous => ({ ...previous, note: event.target.value }))}
-                      className="mt-1 w-full rounded-2xl border px-3 py-2"
-                    />
-                  </div>
-                  <button onClick={saveModify} className="rounded-2xl px-4 py-2 bg-slate-900 text-white">Salva modifica</button>
-                </div>
-              )}
-            </Card>
-          ))}
-        </div>
-      </Shell>
-    );
-  }
+if (screen === 'operator-requests' && currentUser && operatorAccessGranted) {
+  return (
+    <OperatorRequestsScreen
+      currentUser={currentUser}
+      pendingRequests={pendingRequests}
+      modifyDraft={modifyDraft}
+      setModifyDraft={setModifyDraft}
+      decideRequest={decideRequest}
+      startModify={startModify}
+      saveModify={saveModify}
+      goBack={() => setScreen('operator-home')}
+      formatDate={formatDate}
+    />
+  );
+}
 
-  if (screen === 'operator-manual' && currentUser && operatorAccessGranted) {
-    const operatorRules = appState.rules.filter(rule => !rule.boySelectable || rule.kind === 'bonus');
-    const boys = appState.users.filter(user => user.role === 'boy');
-    return (
-      <Shell title="Aggiunta manuale punti" subtitle="Per bonus e malus decisi dagli operatori." onBack={() => setScreen('operator-home')} onReset={resetDemo} currentUser={currentUser}>
-        <div className="max-w-3xl">
-          <Card>
-            <div className="mb-6 pb-6 border-b border-neutral-200">
-              <div className="text-lg font-bold mb-3">Aggiungi un ragazzo</div>
-              <div className="grid md:grid-cols-[1fr_auto] gap-3">
-                <input
-                  value={newBoyName}
-                  onChange={event => setNewBoyName(event.target.value)}
-                  className="w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
-                  placeholder="Scrivi il nome del ragazzo"
-                />
-                <button
-                  onClick={addNewBoy}
-                  className="rounded-2xl px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
-                >
-                  Aggiungi ragazzo
-                </button>
-              </div>
-            </div>
+if (screen === 'operator-manual' && currentUser && operatorAccessGranted) {
+  return (
+    <OperatorManualScreen
+      currentUser={currentUser}
+      appState={appState}
+      operatorTargetUserId={operatorTargetUserId}
+      setOperatorTargetUserId={setOperatorTargetUserId}
+      operatorRuleId={operatorRuleId}
+      setOperatorRuleId={setOperatorRuleId}
+      operatorNote={operatorNote}
+      setOperatorNote={setOperatorNote}
+      newBoyName={newBoyName}
+      setNewBoyName={setNewBoyName}
+      newRuleCategory={newRuleCategory}
+      setNewRuleCategory={setNewRuleCategory}
+      newRuleLabel={newRuleLabel}
+      setNewRuleLabel={setNewRuleLabel}
+      newRulePoints={newRulePoints}
+      setNewRulePoints={setNewRulePoints}
+      newRuleKind={newRuleKind}
+      setNewRuleKind={setNewRuleKind}
+      newRuleSelectable={newRuleSelectable}
+      setNewRuleSelectable={setNewRuleSelectable}
+      deleteBoyId={deleteBoyId}
+      setDeleteBoyId={setDeleteBoyId}
+      deleteRuleId={deleteRuleId}
+      setDeleteRuleId={setDeleteRuleId}
+      editRuleId={editRuleId}
+      setEditRuleId={setEditRuleId}
+      editRuleCategory={editRuleCategory}
+      setEditRuleCategory={setEditRuleCategory}
+      editRuleLabel={editRuleLabel}
+      setEditRuleLabel={setEditRuleLabel}
+      editRulePoints={editRulePoints}
+      setEditRulePoints={setEditRulePoints}
+      editRuleKind={editRuleKind}
+      setEditRuleKind={setEditRuleKind}
+      editRuleSelectable={editRuleSelectable}
+      setEditRuleSelectable={setEditRuleSelectable}
+      editBoyId={editBoyId}
+      setEditBoyId={setEditBoyId}
+      editBoyName={editBoyName}
+      setEditBoyName={setEditBoyName}
+      addNewBoy={addNewBoy}
+      deleteBoy={deleteBoy}
+      updateBoy={updateBoy}
+      passwordBoyId={passwordBoyId}
+      setPasswordBoyId={setPasswordBoyId}
+      newBoyPassword={newBoyPassword}
+      setNewBoyPassword={setNewBoyPassword}
+      updateBoyPassword={updateBoyPassword}
+      addNewRule={addNewRule}
+      deleteRule={deleteRule}
+      updateRule={updateRule}
+      addManualOperatorEntry={addManualOperatorEntry}
+      goBack={() => setScreen('operator-home')}
+    />
+  );
+}
 
-            <div className="mb-6 pb-6 border-b border-neutral-200">
-              <div className="text-lg font-bold mb-3">Elimina un ragazzo</div>
-              <div className="grid md:grid-cols-[1fr_auto] gap-3">
-                <select
-                  value={deleteBoyId}
-                  onChange={event => setDeleteBoyId(event.target.value)}
-                  className="w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
-                >
-                  <option value="">Seleziona un ragazzo</option>
-                  {appState.users
-                    .filter(user => user.role === 'boy')
-                    .map(user => (
-                      <option key={user.id} value={user.id}>{user.name}</option>
-                    ))}
-                </select>
+if (screen === 'operator-history' && currentUser && operatorAccessGranted) {
 
-                <button
-                  onClick={deleteBoy}
-                  className="rounded-2xl px-5 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-sm"
-                >
-                  Elimina ragazzo
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-6 pb-6 border-b border-neutral-200">
-            <div className="text-lg font-bold mb-3">Modifica un ragazzo</div>
-
-            <div className="grid gap-4">
-              <div>
-                <label className="text-sm font-semibold text-neutral-700">Ragazzo da modificare</label>
-                <select
-                  value={editBoyId}
-                  onChange={event => setEditBoyId(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
-                >
-                  {appState.users
-                    .filter(user => user.role === 'boy')
-                    .map(user => (
-                      <option key={user.id} value={user.id}>{user.name}</option>
-                    ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-semibold text-neutral-700">Nuovo nome</label>
-                <input
-                  value={editBoyName}
-                  onChange={event => setEditBoyName(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
-                />
-              </div>
-
-              <div>
-                <button
-                  onClick={updateBoy}
-                  className="rounded-2xl px-5 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold shadow-sm"
-                >
-                  Salva modifica ragazzo
-                </button>
-              </div>
-            </div>
-          </div>
-                  
-            <div className="mb-6 pb-6 border-b border-neutral-200">
-              <div className="text-lg font-bold mb-3">Aggiungi una regola</div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-semibold text-neutral-700">Categoria</label>
-                  <input
-                    value={newRuleCategory}
-                    onChange={event => setNewRuleCategory(event.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
-                    placeholder="Es. Pulizia, Pranzo, Laboratori..."
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-neutral-700">Etichetta</label>
-                  <input
-                    value={newRuleLabel}
-                    onChange={event => setNewRuleLabel(event.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
-                    placeholder="Es. Ho sistemato gli scaffali"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-neutral-700">Punti</label>
-                  <input
-                    value={newRulePoints}
-                    onChange={event => setNewRulePoints(event.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
-                    placeholder="Es. 3 oppure -5"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-neutral-700">Tipo</label>
-                  <select
-                    value={newRuleKind}
-                    onChange={event => setNewRuleKind(event.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
-                  >
-                    <option value="bonus">Bonus</option>
-                    <option value="malus">Malus</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center gap-3">
-                <input
-                  id="boySelectable"
-                  type="checkbox"
-                  checked={newRuleSelectable}
-                  onChange={event => setNewRuleSelectable(event.target.checked)}
-                />
-                <label htmlFor="boySelectable" className="text-sm font-semibold text-neutral-700">
-                  Selezionabile dai ragazzi
-                </label>
-              </div>
-
-              <div className="mt-4">
-                <button
-                  onClick={addNewRule}
-                  className="rounded-2xl px-5 py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold shadow-sm"
-                >
-                  Aggiungi regola
-                </button>
-              </div>
-            </div>
-            
-            <div className="mb-6 pb-6 border-b border-neutral-200">
-              <div className="text-lg font-bold mb-3">Elimina una regola</div>
-              <div className="grid md:grid-cols-[1fr_auto] gap-3">
-                <select
-                  value={deleteRuleId}
-                  onChange={event => setDeleteRuleId(event.target.value)}
-                  className="w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
-                >
-                  <option value="">Seleziona una regola</option>
-                  {appState.rules.map(rule => (
-                    <option key={rule.id} value={rule.id}>
-                      {rule.category} — {rule.label}
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  onClick={deleteRule}
-                  className="rounded-2xl px-5 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-sm"
-                >
-                  Elimina regola
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-6 pb-6 border-b border-neutral-200">
-            <div className="text-lg font-bold mb-3">Modifica una regola</div>
-
-            <div className="grid gap-4">
-              <div>
-                <label className="text-sm font-semibold text-neutral-700">Regola da modificare</label>
-                <select
-                  value={editRuleId}
-                  onChange={event => setEditRuleId(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
-                >
-                  {appState.rules.map(rule => (
-                    <option key={rule.id} value={rule.id}>
-                      {rule.category} — {rule.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-semibold text-neutral-700">Categoria</label>
-                  <input
-                    value={editRuleCategory}
-                    onChange={event => setEditRuleCategory(event.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-neutral-700">Etichetta</label>
-                  <input
-                    value={editRuleLabel}
-                    onChange={event => setEditRuleLabel(event.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-neutral-700">Punti</label>
-                  <input
-                    value={editRulePoints}
-                    onChange={event => setEditRulePoints(event.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-neutral-700">Tipo</label>
-                  <select
-                    value={editRuleKind}
-                    onChange={event => setEditRuleKind(event.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
-                  >
-                    <option value="bonus">Bonus</option>
-                    <option value="malus">Malus</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <input
-                  id="editRuleSelectable"
-                  type="checkbox"
-                  checked={editRuleSelectable}
-                  onChange={event => setEditRuleSelectable(event.target.checked)}
-                />
-                <label htmlFor="editRuleSelectable" className="text-sm font-semibold text-neutral-700">
-                  Selezionabile dai ragazzi
-                </label>
-              </div>
-
-              <div>
-                <button
-                  onClick={updateRule}
-                  className="rounded-2xl px-5 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold shadow-sm"
-                >
-                  Salva modifica regola
-                </button>
-              </div>
-            </div>
-          </div>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-semibold text-neutral-700">Ragazzo</label>
-                <select
-                  value={operatorTargetUserId}
-                  onChange={event => setOperatorTargetUserId(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
-                >
-                  {boys.map(user => (
-                    <option key={user.id} value={user.id}>{user.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-neutral-700">Voce</label>
-                <select
-                  value={operatorRuleId}
-                  onChange={event => setOperatorRuleId(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
-                >
-                  {operatorRules.map(rule => (
-                    <option key={rule.id} value={rule.id}>
-                      {rule.category} — {rule.label} ({rule.points > 0 ? '+' : ''}{rule.points})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="mt-4">
-              <label className="text-sm font-semibold text-neutral-700">Nota facoltativa</label>
-              <input
-                value={operatorNote}
-                onChange={event => setOperatorNote(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
-                placeholder="Es. controllo entrata, comportamento, partecipazione parziale..."
-              />
-            </div>
-            <div className="mt-6">
-              <button onClick={addManualOperatorEntry} className="rounded-2xl px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-sm">
-                Salva movimento
-              </button>
-            </div>
-          </Card>
-        </div>
-      </Shell>
-    );
-  }
-
-  if (screen === 'operator-history' && currentUser && operatorAccessGranted) {
-    const history = [...appState.requests].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    return (
-      <Shell title="Storico" subtitle="Ultimi movimenti registrati." onBack={() => setScreen('operator-home')} onReset={resetDemo} currentUser={currentUser}>
-        <div className="grid gap-3">
-          {history.map(request => {
-            const displayedPoints = getRequestPoints(request);
-            return (
-              <Card key={request.id}>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm text-neutral-500">{request.userName} · {formatDate(request.createdAt)}</div>
-                    <div className="font-semibold">{request.activity}</div>
-                    {request.note && <div className="text-sm text-neutral-600">Nota: {request.note}</div>}
-                    {request.decidedBy && <div className="text-xs text-neutral-500 mt-1">Gestito da {request.decidedBy}</div>}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Pill className={STATUS_STYLES[request.status] || 'bg-white'}>{getStatusLabel(request)}</Pill>
-                    <div className={`font-bold text-lg ${displayedPoints >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                      {displayedPoints > 0 ? '+' : ''}{displayedPoints}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      </Shell>
-    );
-  }
+  return (
+    <OperatorHistoryScreen
+      currentUser={currentUser}
+      history={history}
+      goBack={() => setScreen('operator-home')}
+      statusStyles={STATUS_STYLES}
+      formatDate={formatDate}
+      getRequestPoints={getRequestPoints}
+      getStatusLabel={getStatusLabel}
+      deleteRequest={deleteRequest}
+    />
+  );
+}
 
   return null;
 }
