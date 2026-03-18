@@ -25,6 +25,11 @@ import BoyItemsScreen from './components/screens/BoyItemsScreen';
 import BoyConfirmScreen from './components/screens/BoyConfirmScreen';
 import BoyLoginScreen from './components/screens/BoyLoginScreen';
 import BoyChangePasswordScreen from './components/screens/BoyChangePasswordScreen';
+import VisitorLoginScreen from './components/screens/VisitorLoginScreen';
+import VisitorHomeScreen from './components/screens/VisitorHomeScreen';
+import VisitorRulesScreen from './components/screens/VisitorRulesScreen';
+import VisitorHowItWorksScreen from './components/screens/VisitorHowItWorksScreen';
+import BoyAvatarScreen from './components/screens/BoyAvatarScreen';
 
 const OPERATOR_PASSWORD = import.meta.env.VITE_OPERATOR_PASSWORD;
 
@@ -66,7 +71,19 @@ export default function FantaMasMockup() {
   const [editBoyName, setEditBoyName] = useState('');
   const [modifyDraft, setModifyDraft] = useState({ requestId: '', finalPoints: '', note: '' });
   const [operatorPasswordInput, setOperatorPasswordInput] = useState('');
+  const [operatorUsernameInput, setOperatorUsernameInput] = useState('');
   const [operatorAccessGranted, setOperatorAccessGranted] = useState(false);
+  const [currentOperator, setCurrentOperator] = useState(null);
+  const currentBoy = useMemo(
+  () => appState.users.find(user => user.id === currentUserId) || null,
+  [appState.users, currentUserId]
+);
+  const [visitorUsernameInput, setVisitorUsernameInput] = useState('');
+  const [visitorPasswordInput, setVisitorPasswordInput] = useState('');
+  const [visitorAccessGranted, setVisitorAccessGranted] = useState(false);
+  const [currentVisitor, setCurrentVisitor] = useState(null);
+  const [selectedAvatarKey, setSelectedAvatarKey] = useState('');
+  // const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     runSelfChecks();
@@ -102,15 +119,14 @@ export default function FantaMasMockup() {
   }
 
   setAppState({
-    users: [
-      ...(boysData || []).map(user => ({
-        id: user.id,
-        name: user.name,
-        role: user.role,
-        password: user.password || '',
-      })),
-      { id: 'operatore-1', name: 'Operatore', role: 'operator' },
-    ],
+    users: (boysData || []).map(user => ({
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      password: user.password || '',
+      avatar_url: user.avatar_url || '',
+      avatar_key: user.avatar_key || '',
+    })),
     rules: (rulesData || []).map(rule => ({
       id: rule.id,
       category: rule.category,
@@ -185,7 +201,19 @@ useEffect(() => {
   setEditBoyName(selectedBoy.name);
 }, [appState.users, editBoyId]);
 
-  const currentUser = useMemo(() => appState.users.find(user => user.id === currentUserId) || null, [appState.users, currentUserId]);
+  const currentUser = useMemo(() => {
+    if (boyAccessGranted && currentBoy) return currentBoy;
+    if (operatorAccessGranted && currentOperator) return currentOperator;
+    if (visitorAccessGranted && currentVisitor) return currentVisitor;
+    return currentBoy || currentOperator || currentVisitor || null;
+  }, [
+    boyAccessGranted,
+    currentBoy,
+    operatorAccessGranted,
+    currentOperator,
+    visitorAccessGranted,
+    currentVisitor,
+  ]);
   const categories = useMemo(() => Object.values(groupRules(appState.rules)), [appState.rules]);
   const selectedCategoryData = categories.find(category => category.key === selectedCategory) || null;
   const selectedRule = appState.rules.find(rule => rule.id === selectedRuleId) || null;
@@ -212,21 +240,104 @@ function loginAs(userId) {
   setScreen('boy-login');
 }
 
-function submitOperatorPassword() {
-  if (operatorPasswordInput === OPERATOR_PASSWORD) {
-    setOperatorAccessGranted(true);
-    setOperatorPasswordInput('');
-    setScreen('operator-home');
+// function submitOperatorPassword() {
+//  if (operatorPasswordInput === OPERATOR_PASSWORD) {
+//    setOperatorAccessGranted(true);
+//    setOperatorPasswordInput('');
+//    setScreen('operator-home');
+//    return;
+//  }
+//
+//  alert('Password operatore non corretta');
+// }
+
+async function submitOperatorPassword() {
+  const username = operatorUsernameInput.trim().toLowerCase();
+  const password = operatorPasswordInput.trim();
+
+  if (!username || !password) {
+    alert('Inserisci username e password');
     return;
   }
 
-  alert('Password operatore non corretta');
+  const { data, error } = await supabase
+    .from('operators')
+    .select('id, name, username, password, active')
+    .eq('username', username)
+    .eq('active', true)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Errore login operatore', error);
+    alert('Errore durante il login operatore');
+    return;
+  }
+
+  if (!data || String(data.password).trim() !== password) {
+    alert('Credenziali operatore non corrette');
+    return;
+  }
+
+  setCurrentOperator({
+    id: data.id,
+    name: data.name,
+    role: 'operator',
+    username: data.username,
+  });
+
+  setOperatorAccessGranted(true);
+  setOperatorUsernameInput('');
+  setOperatorPasswordInput('');
+  setScreen('operator-home');
+}
+
+async function submitVisitorLogin() {
+  const username = visitorUsernameInput.trim().toLowerCase();
+  const password = visitorPasswordInput.trim();
+
+  if (!username || !password) {
+    alert('Inserisci username e password');
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from('visitors')
+    .select('id, name, username, password, active')
+    .eq('username', username)
+    .eq('active', true)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Errore login visitatore', error);
+    alert('Errore durante il login visitatore');
+    return;
+  }
+
+  if (!data || String(data.password).trim() !== password) {
+    alert('Credenziali visitatore non corrette');
+    return;
+  }
+
+  setCurrentVisitor({
+    id: data.id,
+    name: data.name,
+    role: 'visitor',
+    username: data.username,
+  });
+
+  setVisitorAccessGranted(true);
+  setVisitorUsernameInput('');
+  setVisitorPasswordInput('');
+  setScreen('visitor-home');
 }
 
 function logoutOperator() {
   setOperatorAccessGranted(false);
+  setOperatorUsernameInput('');
   setOperatorPasswordInput('');
+  setCurrentOperator(null);
   setCurrentUserId('');
+  setBoyAccessGranted(false);
   setScreen('landing');
 }
 
@@ -251,6 +362,33 @@ function logoutBoy() {
   setNewBoyPasswordInput('');
   setConfirmBoyPasswordInput('');
   setCurrentUserId('');
+  setCurrentOperator(null);
+  setScreen('landing');
+}
+
+async function saveBoyAvatar() {
+  if (!currentUserId || !selectedAvatarKey) return;
+
+  const { error } = await supabase
+    .from('boys')
+    .update({ avatar_key: selectedAvatarKey })
+    .eq('id', currentUserId);
+
+  if (error) {
+    console.error('Errore salvataggio avatar', error);
+    alert('Errore durante il salvataggio dell’avatar');
+    return;
+  }
+
+  await loadSupabaseData();
+  setScreen('boy-home');
+}
+
+function logoutVisitor() {
+  setVisitorAccessGranted(false);
+  setVisitorUsernameInput('');
+  setVisitorPasswordInput('');
+  setCurrentVisitor(null);
   setScreen('landing');
 }
 
@@ -723,6 +861,8 @@ if (screen === 'landing') {
     <LandingScreen
       users={appState.users}
       loginAs={loginAs}
+      goToOperatorLogin={() => setScreen('operator-login')}
+      goToVisitorLogin={() => setScreen('visitor-login')}
     />
   );
 }
@@ -755,6 +895,10 @@ if (screen === 'boy-home' && currentUser && boyAccessGranted) {
       goToLeaderboard={() => setScreen('boy-leaderboard')}
       goToRequests={() => setScreen('boy-requests')}
       goToChangePassword={() => setScreen('boy-change-password')}
+      goToAvatar={() => {
+        setSelectedAvatarKey(currentUser?.avatar_key || '');
+        setScreen('boy-avatar');
+      }}
     />
   );
 }
@@ -822,22 +966,6 @@ if (screen === 'boy-leaderboard' && currentUser && boyAccessGranted) {
   );
 }
 
-if (screen === 'boy-home' && currentUser && boyAccessGranted) {
-  return (
-    <BoyHomeScreen
-      currentUser={currentUser}
-      myPoints={myPoints}
-      myPosition={myPosition}
-      myRequests={myRequests}
-      goBack={logoutBoy}
-      goToCategories={() => setScreen('boy-categories')}
-      goToLeaderboard={() => setScreen('boy-leaderboard')}
-      goToRequests={() => setScreen('boy-requests')}
-      goToChangePassword={() => setScreen('boy-change-password')}
-    />
-  );
-}
-
 if (screen === 'boy-change-password' && currentUser && boyAccessGranted) {
   return (
     <BoyChangePasswordScreen
@@ -854,10 +982,24 @@ if (screen === 'boy-change-password' && currentUser && boyAccessGranted) {
   );
 }
 
-if (screen === 'operator-login' && currentUser) {
+if (screen === 'boy-avatar' && currentUser && boyAccessGranted) {
+  return (
+    <BoyAvatarScreen
+      currentUser={currentUser}
+      selectedAvatarKey={selectedAvatarKey}
+      setSelectedAvatarKey={setSelectedAvatarKey}
+      saveAvatar={saveBoyAvatar}
+      goBack={() => setScreen('boy-home')}
+    />
+  );
+}
+
+if (screen === 'operator-login') {
   return (
     <OperatorLoginScreen
       currentUser={currentUser}
+      operatorUsernameInput={operatorUsernameInput}
+      setOperatorUsernameInput={setOperatorUsernameInput}
       operatorPasswordInput={operatorPasswordInput}
       setOperatorPasswordInput={setOperatorPasswordInput}
       submitOperatorPassword={submitOperatorPassword}
@@ -866,7 +1008,7 @@ if (screen === 'operator-login' && currentUser) {
   );
 }
 
-if (screen === 'operator-home' && currentUser && operatorAccessGranted) {
+if (screen === 'operator-home' && currentUser?.role === 'operator' && operatorAccessGranted) {
   return (
     <OperatorHomeScreen
       currentUser={currentUser}
@@ -875,6 +1017,7 @@ if (screen === 'operator-home' && currentUser && operatorAccessGranted) {
       goToRequests={() => setScreen('operator-requests')}
       goToManual={() => setScreen('operator-manual')}
       goToHistory={() => setScreen('operator-history')}
+      goToLeaderboard={() => setScreen('operator-leaderboard')}
     />
   );
 }
@@ -967,6 +1110,71 @@ if (screen === 'operator-history' && currentUser && operatorAccessGranted) {
       getRequestPoints={getRequestPoints}
       getStatusLabel={getStatusLabel}
       deleteRequest={deleteRequest}
+    />
+  );
+}
+
+if (screen === 'operator-leaderboard' && currentUser?.role === 'operator' && operatorAccessGranted) {
+  return (
+    <BoyLeaderboardScreen
+      currentUser={currentUser}
+      leaderboard={leaderboard}
+      goBack={() => setScreen('operator-home')}
+    />
+  );
+}
+
+if (screen === 'visitor-login') {
+  return (
+    <VisitorLoginScreen
+      currentUser={currentUser}
+      visitorUsernameInput={visitorUsernameInput}
+      setVisitorUsernameInput={setVisitorUsernameInput}
+      visitorPasswordInput={visitorPasswordInput}
+      setVisitorPasswordInput={setVisitorPasswordInput}
+      submitVisitorLogin={submitVisitorLogin}
+      onBack={() => setScreen('landing')}
+    />
+  );
+}
+
+if (screen === 'visitor-home' && currentUser?.role === 'visitor' && visitorAccessGranted) {
+  return (
+    <VisitorHomeScreen
+      currentUser={currentUser}
+      onLogout={logoutVisitor}
+      goToLeaderboard={() => setScreen('visitor-leaderboard')}
+      goToRules={() => setScreen('visitor-rules')}
+      goToHowItWorks={() => setScreen('visitor-how-it-works')}
+    />
+  );
+}
+
+if (screen === 'visitor-leaderboard' && currentUser?.role === 'visitor' && visitorAccessGranted) {
+  return (
+    <BoyLeaderboardScreen
+      currentUser={currentUser}
+      leaderboard={leaderboard}
+      goBack={() => setScreen('visitor-home')}
+    />
+  );
+}
+
+if (screen === 'visitor-rules' && currentUser?.role === 'visitor' && visitorAccessGranted) {
+  return (
+    <VisitorRulesScreen
+      currentUser={currentUser}
+      rules={appState.rules}
+      goBack={() => setScreen('visitor-home')}
+    />
+  );
+}
+
+if (screen === 'visitor-how-it-works' && currentUser?.role === 'visitor' && visitorAccessGranted) {
+  return (
+    <VisitorHowItWorksScreen
+      currentUser={currentUser}
+      goBack={() => setScreen('visitor-home')}
     />
   );
 }

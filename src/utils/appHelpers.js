@@ -3,7 +3,6 @@ export const DEFAULT_USERS = [
   { id: 'sara', name: 'Sara', role: 'boy' },
   { id: 'luca', name: 'Luca', role: 'boy' },
   { id: 'giulia', name: 'Giulia', role: 'boy' },
-  { id: 'operatore-1', name: 'Operatore', role: 'operator' },
 ];
 
 export const DEFAULT_RULES = [
@@ -131,18 +130,25 @@ export function groupRules(rules) {
 
 export function computeLeaderboard(users, requests) {
   const boys = users.filter(user => user.role === 'boy');
+
   return boys
     .map(user => {
       const points = requests
         .filter(request => request.userId === user.id && ['approved', 'modified'].includes(request.status))
         .reduce((sum, request) => sum + getRequestPoints(request), 0);
-      return { id: user.id, name: user.name, points };
+
+      return {
+        id: user.id,
+        name: user.name,
+        avatar_url: user.avatar_url || '',
+        avatar_key: user.avatar_key || '',
+        points,
+      };
     })
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'it'));
 }
 
 export function runSelfChecks() {
-  console.assert(DEFAULT_USERS.some(user => user.role === 'operator'), 'Serve almeno un operatore');
   console.assert(DEFAULT_RULES.some(rule => rule.boySelectable), 'Serve almeno una regola selezionabile dai ragazzi');
   console.assert(DEFAULT_RULES.some(rule => rule.kind === 'malus'), 'Serve almeno un malus');
   console.assert(computeLeaderboard(DEFAULT_USERS, DEFAULT_REQUESTS).length >= 1, 'La classifica deve essere calcolabile');

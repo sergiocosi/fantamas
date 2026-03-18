@@ -1,14 +1,13 @@
 import Shell from '../ui/Shell';
-import Card from '../ui/Card';
 import ActionButton from '../ui/ActionButton';
 
 export default function OperatorHomeScreen({
   currentUser,
-  pendingRequests,
   onLogout,
   goToRequests,
   goToManual,
   goToHistory,
+  goToLeaderboard,
 }) {
   return (
     <Shell
@@ -17,13 +16,20 @@ export default function OperatorHomeScreen({
       onBack={onLogout}
       currentUser={currentUser}
     >
-      <div className="grid lg:grid-cols-4 gap-4">
-        <Card className="bg-slate-900 text-white lg:col-span-1">
-          <div className="text-sm text-slate-300 uppercase tracking-wider">Richieste in attesa</div>
-          <div className="text-6xl font-black mt-2">{pendingRequests.length}</div>
-          <div className="text-sm text-slate-300 mt-2">Da controllare adesso</div>
-        </Card>
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-sm text-neutral-600">
+          Operatore: <span className="font-semibold">{currentUser?.name || '—'}</span>
+        </div>
 
+        <button
+          onClick={onLogout}
+          className="rounded-2xl px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold shadow-sm"
+        >
+          Esci
+        </button>
+      </div>
+
+      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
         <ActionButton onClick={goToRequests}>
           <div className="text-3xl mb-2">✅</div>
           <div className="font-semibold">Verifica richieste</div>
@@ -40,6 +46,12 @@ export default function OperatorHomeScreen({
           <div className="text-3xl mb-2">🕘</div>
           <div className="font-semibold">Storico</div>
           <div className="text-sm text-neutral-600">Tutti i movimenti</div>
+        </ActionButton>
+
+        <ActionButton onClick={goToLeaderboard}>
+          <div className="text-3xl mb-2">🏆</div>
+          <div className="font-semibold">Classifica ragazzi</div>
+          <div className="text-sm text-neutral-600">Visualizza punteggi e posizioni</div>
         </ActionButton>
       </div>
     </Shell>

@@ -3,16 +3,11 @@ import Shell from '../ui/Shell';
 import Card from '../ui/Card';
 import ActionButton from '../ui/ActionButton';
 
-export default function LandingScreen({ users, loginAs }) {
+export default function LandingScreen({ users, loginAs, goToOperatorLogin, goToVisitorLogin }) {
   const [boySearch, setBoySearch] = useState('');
 
   const boys = useMemo(
     () => users.filter(user => user.role === 'boy'),
-    [users]
-  );
-
-  const operators = useMemo(
-    () => users.filter(user => user.role === 'operator'),
     [users]
   );
 
@@ -40,14 +35,14 @@ export default function LandingScreen({ users, loginAs }) {
             </div>
             <div className="rounded-[24px] bg-white/15 backdrop-blur px-5 py-4 min-w-[220px]">
               <div className="text-sm text-orange-100">Profili disponibili</div>
-              <div className="text-3xl font-black mt-1">{boys.length + operators.length}</div>
-              <div className="text-sm text-orange-50 mt-1">ragazzi + operatori</div>
+              <div className="text-3xl font-black mt-1">{boys.length}</div>
+              <div className="text-sm text-orange-50 mt-1">ragazzi registrati</div>
             </div>
           </div>
         </Card>
       </div>
 
-      <div className="grid xl:grid-cols-2 gap-6">
+      <div className="grid xl:grid-cols-3 gap-6">
         <Card className="bg-orange-50 border-orange-200">
           <div className="text-5xl mb-4">🧑‍🤝‍🧑</div>
           <div className="text-2xl font-bold mb-2">Area Ragazzi</div>
@@ -87,17 +82,33 @@ export default function LandingScreen({ users, loginAs }) {
           <p className="text-neutral-700 mb-5 text-base leading-6">
             Gli operatori verificano le richieste e possono aggiungere bonus o malus manualmente.
           </p>
+
           <div className="grid gap-3">
-            {operators.map(user => (
-              <ActionButton
-                key={user.id}
-                onClick={() => loginAs(user.id)}
-                className="bg-slate-900 text-white border-slate-900 hover:bg-slate-800"
-              >
-                <div className="text-lg font-bold">Entra come {user.name}</div>
-                <div className="text-sm text-slate-300 mt-1">Profilo operatore</div>
-              </ActionButton>
-            ))}
+            <ActionButton
+              onClick={goToOperatorLogin}
+              className="bg-slate-900 text-white border-slate-900 hover:bg-slate-800"
+            >
+              <div className="text-lg font-bold">Accedi come operatore</div>
+              <div className="text-sm text-slate-300 mt-1">Username e password</div>
+            </ActionButton>
+          </div>
+        </Card>
+
+        <Card className="bg-emerald-50 border-emerald-200">
+          <div className="text-5xl mb-4">👀</div>
+          <div className="text-2xl font-bold mb-2">Area Visitatore</div>
+          <p className="text-neutral-700 mb-5 text-base leading-6">
+            Accesso in sola lettura per vedere classifica, attività e funzionamento del progetto.
+          </p>
+
+          <div className="grid gap-3">
+            <ActionButton
+              onClick={goToVisitorLogin}
+              className="bg-emerald-700 text-white border-emerald-700 hover:bg-emerald-600"
+            >
+              <div className="text-lg font-bold">Accedi come visitatore</div>
+              <div className="text-sm text-emerald-100 mt-1">Username e password</div>
+            </ActionButton>
           </div>
         </Card>
       </div>
