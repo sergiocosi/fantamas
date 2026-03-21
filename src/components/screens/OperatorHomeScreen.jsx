@@ -3,11 +3,13 @@ import ActionButton from '../ui/ActionButton';
 
 export default function OperatorHomeScreen({
   currentUser,
+  pendingRequests,
   onLogout,
   goToRequests,
   goToManual,
   goToHistory,
   goToLeaderboard,
+  setScreen,
 }) {
   return (
     <Shell
@@ -29,7 +31,7 @@ export default function OperatorHomeScreen({
         </button>
       </div>
 
-      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4">
         <ActionButton onClick={goToRequests}>
           <div className="text-3xl mb-2">✅</div>
           <div className="font-semibold">Verifica richieste</div>
@@ -52,6 +54,12 @@ export default function OperatorHomeScreen({
           <div className="text-3xl mb-2">🏆</div>
           <div className="font-semibold">Classifica ragazzi</div>
           <div className="text-sm text-neutral-600">Visualizza punteggi e posizioni</div>
+        </ActionButton>
+
+        <ActionButton onClick={() => setScreen('operator-change-password')}>
+          <div className="text-3xl mb-2">🔐</div>
+          <div className="font-semibold">Cambio Password</div>
+          <div className="text-sm text-neutral-600">Clicca per cambiare password</div>
         </ActionButton>
       </div>
     </Shell>

@@ -19,7 +19,7 @@ export default function BoyLeaderboardScreen({
   return (
     <Shell
       title="Classifica"
-      subtitle="Punteggio totale demo."
+      subtitle="Punteggio totale"
       onBack={goBack}
       currentUser={currentUser}
     >
