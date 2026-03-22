@@ -51,8 +51,6 @@ function clearSession() {
   localStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
-const OPERATOR_PASSWORD = import.meta.env.VITE_OPERATOR_PASSWORD;
-
 export default function FantaMasMockup() {
   const [appState, setAppState] = useState({
     users: [],
@@ -60,7 +58,6 @@ export default function FantaMasMockup() {
     requests: [],
   });
   const [screen, setScreen] = useState('landing');
-  const [sessionRestored, setSessionRestored] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedRuleId, setSelectedRuleId] = useState('');
@@ -76,7 +73,6 @@ export default function FantaMasMockup() {
   const [currentBoyPasswordInput, setCurrentBoyPasswordInput] = useState('');
   const [newBoyPasswordInput, setNewBoyPasswordInput] = useState('');
   const [confirmBoyPasswordInput, setConfirmBoyPasswordInput] = useState('');
-  const boys = appState.users.filter(user => user.role === 'boy');
   const [newRuleCategory, setNewRuleCategory] = useState('');
   const [newRuleLabel, setNewRuleLabel] = useState('');
   const [newRulePoints, setNewRulePoints] = useState('');
@@ -90,9 +86,6 @@ export default function FantaMasMockup() {
   const [editRulePoints, setEditRulePoints] = useState('');
   const [editRuleKind, setEditRuleKind] = useState('bonus');
   const [editRuleSelectable, setEditRuleSelectable] = useState(true);
-  const [selectedAdjustmentUserId, setSelectedAdjustmentUserId] = useState('');
-  const [adjustmentPointsInput, setAdjustmentPointsInput] = useState('');
-  const [adjustmentReasonInput, setAdjustmentReasonInput] = useState('');
   const [editBoyId, setEditBoyId] = useState('');
   const [editBoyName, setEditBoyName] = useState('');
   const [modifyDraft, setModifyDraft] = useState({ requestId: '', finalPoints: '', note: '' });
@@ -115,196 +108,168 @@ export default function FantaMasMockup() {
   }, []);
 
   async function loadSupabaseData() {
-  try {
-    const { data, error } = await supabase.functions.invoke('get-app-data', {
-      body: {},
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke('get-app-data', {
+        body: {},
+      });
 
-    if (error) {
-      console.error('Errore invoke get-app-data', error);
-      return;
-    }
-
-    if (!data?.ok) {
-      console.error('Errore caricamento dati app', data?.error);
-      return;
-    }
-
-    setAppState(prev => ({
-      ...prev,
-      users: (data.boys || []).map(user => ({
-        id: user.id,
-        name: user.name,
-        role: 'boy',
-        username: user.username || '',
-        avatar_url: user.avatar_url || '',
-        avatar_key: user.avatar_key && user.avatar_key !== 'NULL' ? user.avatar_key : '',
-      })),
-      rules: (data.rules || []).map(rule => ({
-        id: rule.id,
-        category: rule.category,
-        label: rule.label,
-        points: rule.points,
-        kind: rule.kind,
-        boySelectable: rule.boy_selectable,
-        icon: rule.icon,
-        color: rule.color,
-      })),
-      requests: (data.requests || []).map(request => ({
-        id: request.id,
-        userId: request.user_id,
-        userName: request.user_name,
-        ruleId: request.rule_id,
-        activity: request.activity,
-        points: request.points,
-        finalPoints: request.final_points,
-        status: request.status,
-        createdAt: request.created_at,
-        note: request.note || '',
-        decidedBy: request.decided_by || '',
-      })),
-    }));
-  } catch (err) {
-    console.error('Eccezione loadSupabaseData', err);
-  }
-}
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function restoreSession() {
-      const savedSession = loadSession();
-
-      if (!savedSession?.accessGranted) {
-        if (isMounted) setSessionRestored(true);
+      if (error) {
+        console.error('Errore invoke get-app-data', error);
         return;
       }
 
-      const { role, userId } = savedSession;
+      if (!data?.ok) {
+        console.error('Errore caricamento dati app', data?.error);
+        return;
+      }
 
-      if (!role) {
+      setAppState({
+        users: (data.boys || []).map(user => ({
+          id: user.id,
+          name: user.name,
+          role: 'boy',
+          username: user.username || '',
+          avatar_url: user.avatar_url || '',
+          avatar_key: user.avatar_key && user.avatar_key !== 'NULL' ? user.avatar_key : '',
+        })),
+        rules: (data.rules || []).map(rule => ({
+          id: rule.id,
+          category: rule.category,
+          label: rule.label,
+          points: rule.points,
+          kind: rule.kind,
+          boySelectable: rule.boy_selectable,
+          icon: rule.icon,
+          color: rule.color,
+        })),
+        requests: (data.requests || []).map(request => ({
+          id: request.id,
+          userId: request.user_id,
+          userName: request.user_name,
+          ruleId: request.rule_id,
+          activity: request.activity,
+          points: request.points,
+          finalPoints: request.final_points,
+          status: request.status,
+          createdAt: request.created_at,
+          note: request.note || '',
+          decidedBy: request.decided_by || '',
+        })),
+      });
+    } catch (err) {
+      console.error('Eccezione loadSupabaseData', err);
+    }
+  }
+
+  useEffect(() => {
+  let isMounted = true;
+
+  async function restoreSession() {
+    const savedSession = loadSession();
+
+    if (!savedSession?.accessGranted) {
+      if (isMounted) setSessionRestored(true);
+      return;
+    }
+
+    const { role, userId } = savedSession;
+
+    if (!role || !userId) {
+      clearSession();
+      if (isMounted) setSessionRestored(true);
+      return;
+    }
+
+    if (isMounted) {
+      setBoyAccessGranted(false);
+      setOperatorAccessGranted(false);
+      setVisitorAccessGranted(false);
+      setCurrentUserId('');
+      setCurrentOperator(null);
+      setCurrentVisitor(null);
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('bootstrap-session', {
+        body: {
+          role,
+          userId,
+        },
+      });
+
+      if (error) {
+        console.error('Errore invoke bootstrap-session', error);
         clearSession();
         if (isMounted) setSessionRestored(true);
         return;
       }
 
-      if (isMounted) {
-        setBoyAccessGranted(false);
-        setOperatorAccessGranted(false);
-        setVisitorAccessGranted(false);
-        setCurrentUserId('');
-        setCurrentOperator(null);
-        setCurrentVisitor(null);
+      if (!data?.ok || !data?.user) {
+        console.error('Errore bootstrap session', data?.error);
+        clearSession();
+        if (isMounted) setSessionRestored(true);
+        return;
       }
 
+      const user = data.user;
+
       if (role === 'boy') {
-        if (!userId) {
-          clearSession();
-          if (isMounted) setSessionRestored(true);
-          return;
-        }
-
-        const boy = appState.users.find(
-          item => String(item.id) === String(userId) && item.role === 'boy'
-        );
-
-        if (!boy) {
-          if (isMounted) setSessionRestored(true);
-          return;
-        }
-
         if (isMounted) {
-          setCurrentUserId(boy.id);
+          setCurrentUserId(user.id);
           setBoyAccessGranted(true);
           setScreen('boy-home');
           setSessionRestored(true);
         }
-
         return;
       }
 
       if (role === 'operator') {
-        if (!userId) {
-          clearSession();
-          if (isMounted) setSessionRestored(true);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('operators')
-          .select('id, name, username, active')
-          .eq('id', userId)
-          .eq('active', true)
-          .maybeSingle();
-
-        if (error || !data) {
-          console.error('Errore ripristino sessione operatore', error);
-          clearSession();
-          if (isMounted) setSessionRestored(true);
-          return;
-        }
-
         if (isMounted) {
           setCurrentOperator({
-            id: data.id,
-            name: data.name,
+            id: user.id,
+            name: user.name,
             role: 'operator',
-            username: data.username,
+            username: user.username,
           });
+          setCurrentUserId(user.id);
           setOperatorAccessGranted(true);
           setScreen('operator-home');
           setSessionRestored(true);
         }
-
         return;
       }
 
       if (role === 'visitor') {
-        if (!userId) {
-          clearSession();
-          if (isMounted) setSessionRestored(true);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('visitors')
-          .select('id, name, username, active')
-          .eq('id', userId)
-          .eq('active', true)
-          .maybeSingle();
-
-        if (error || !data) {
-          console.error('Errore ripristino sessione visitatore', error);
-          clearSession();
-          if (isMounted) setSessionRestored(true);
-          return;
-        }
-
         if (isMounted) {
           setCurrentVisitor({
-            id: data.id,
-            name: data.name,
+            id: user.id,
+            name: user.name,
             role: 'visitor',
-            username: data.username,
+            username: user.username,
           });
+          setCurrentUserId(user.id);
           setVisitorAccessGranted(true);
           setScreen('visitor-home');
           setSessionRestored(true);
         }
-
         return;
       }
 
       clearSession();
       if (isMounted) setSessionRestored(true);
+    } catch (err) {
+      console.error('Eccezione bootstrap session', err);
+      clearSession();
+      if (isMounted) setSessionRestored(true);
     }
+  }
 
-    restoreSession();
+  restoreSession();
 
-    return () => {
-      isMounted = false;
-    };
-  }, [appState.users]);
+  return () => {
+    isMounted = false;
+  };
+}, []);
 
   useEffect(() => {
     const boysList = appState.users.filter(user => user.role === 'boy');
@@ -395,22 +360,6 @@ export default function FantaMasMockup() {
     () => [...appState.requests].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
     [appState.requests]
   );
-
-  function loginAs(userId) {
-    const user = appState.users.find(item => item.id === userId);
-    if (!user) return;
-
-    setCurrentUserId(userId);
-
-    if (user.role === 'operator') {
-      setScreen('operator-login');
-      return;
-    }
-
-    setBoyPasswordInput('');
-    setBoyAccessGranted(false);
-    setScreen('boy-login');
-  }
 
   async function submitOperatorPassword() {
   const username = operatorUsernameInput.trim().toLowerCase();
