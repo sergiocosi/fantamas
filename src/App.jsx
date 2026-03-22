@@ -69,6 +69,7 @@ export default function FantaMasMockup() {
   const [operatorNote, setOperatorNote] = useState('');
   const [newBoyName, setNewBoyName] = useState('');
   const [boyPasswordInput, setBoyPasswordInput] = useState('');
+  const [boyUsernameInput, setBoyUsernameInput] = useState('');
   const [boyAccessGranted, setBoyAccessGranted] = useState(false);
   const [passwordBoyId, setPasswordBoyId] = useState('');
   const [newBoyPassword, setNewBoyPassword] = useState('');
@@ -114,41 +115,32 @@ export default function FantaMasMockup() {
   }, []);
 
   async function loadSupabaseData() {
-    const { data: boysData, error: boysError } = await supabase
-      .from('boys')
-      .select('*')
-      .order('created_at', { ascending: true });
+  try {
+    const { data, error } = await supabase.functions.invoke('get-app-data', {
+      body: {},
+    });
 
-    const { data: rulesData, error: rulesError } = await supabase
-      .from('rules')
-      .select('*')
-      .order('created_at', { ascending: true });
+    if (error) {
+      console.error('Errore invoke get-app-data', error);
+      return;
+    }
 
-    const { data: requestsData, error: requestsError } = await supabase
-      .from('requests')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (boysError || rulesError || requestsError) {
-      console.error('Errore caricamento Supabase', {
-        boysError,
-        rulesError,
-        requestsError,
-      });
+    if (!data?.ok) {
+      console.error('Errore caricamento dati app', data?.error);
       return;
     }
 
     setAppState(prev => ({
       ...prev,
-      users: (boysData || []).map(user => ({
+      users: (data.boys || []).map(user => ({
         id: user.id,
         name: user.name,
-        role: user.role,
-        password: user.password || '',
+        role: 'boy',
+        username: user.username || '',
         avatar_url: user.avatar_url || '',
         avatar_key: user.avatar_key && user.avatar_key !== 'NULL' ? user.avatar_key : '',
       })),
-      rules: (rulesData || []).map(rule => ({
+      rules: (data.rules || []).map(rule => ({
         id: rule.id,
         category: rule.category,
         label: rule.label,
@@ -158,7 +150,7 @@ export default function FantaMasMockup() {
         icon: rule.icon,
         color: rule.color,
       })),
-      requests: (requestsData || []).map(request => ({
+      requests: (data.requests || []).map(request => ({
         id: request.id,
         userId: request.user_id,
         userName: request.user_name,
@@ -172,7 +164,10 @@ export default function FantaMasMockup() {
         decidedBy: request.decided_by || '',
       })),
     }));
+  } catch (err) {
+    console.error('Eccezione loadSupabaseData', err);
   }
+}
 
   useEffect(() => {
     let isMounted = true;
@@ -237,7 +232,7 @@ export default function FantaMasMockup() {
 
         const { data, error } = await supabase
           .from('operators')
-          .select('id, name, username, password, active')
+          .select('id, name, username, active')
           .eq('id', userId)
           .eq('active', true)
           .maybeSingle();
@@ -255,7 +250,6 @@ export default function FantaMasMockup() {
             name: data.name,
             role: 'operator',
             username: data.username,
-            password: data.password,
           });
           setOperatorAccessGranted(true);
           setScreen('operator-home');
@@ -377,11 +371,7 @@ export default function FantaMasMockup() {
     () => computeLeaderboard(appState.users, appState.requests, appState.rules),
     [appState.users, appState.requests, appState.rules]
   );
-  console.log('DEBUG users', appState.users);
-  console.log('DEBUG rules', appState.rules);
-  console.log('DEBUG requests', appState.requests);
-  console.log('DEBUG leaderboard', leaderboard);
-  console.log('DEBUG screen/currentUser', screen, currentUser);
+  
   const pendingRequests = useMemo(
     () => appState.requests.filter(request => request.status === 'pending'),
     [appState.requests]
@@ -423,42 +413,44 @@ export default function FantaMasMockup() {
   }
 
   async function submitOperatorPassword() {
-    const username = operatorUsernameInput.trim().toLowerCase();
-    const password = operatorPasswordInput.trim();
+  const username = operatorUsernameInput.trim().toLowerCase();
+  const password = operatorPasswordInput.trim();
 
-    if (!username || !password) {
-      alert('Inserisci username e password');
-      return;
-    }
+  if (!username || !password) {
+    alert('Inserisci username e password');
+    return;
+  }
 
-    const { data, error } = await supabase
-      .from('operators')
-      .select('id, name, username, password, active')
-      .eq('username', username)
-      .eq('active', true)
-      .maybeSingle();
+  try {
+    const { data, error } = await supabase.functions.invoke('login-operator', {
+      body: {
+        username,
+        password,
+      },
+    });
 
     if (error) {
-      console.error('Errore login operatore', error);
+      console.error('Errore invoke login-operator', error);
       alert('Errore durante il login operatore');
       return;
     }
 
-    if (!data || String(data.password).trim() !== password) {
-      alert('Credenziali operatore non corrette');
+    if (!data?.ok || !data?.operator) {
+      alert(data?.error || 'Credenziali operatore non corrette');
       return;
     }
 
+    const operator = data.operator;
+
     setCurrentOperator({
-      id: data.id,
-      name: data.name,
+      id: operator.id,
+      name: operator.name,
       role: 'operator',
-      username: data.username,
-      password: data.password,
+      username: operator.username,
     });
 
     setCurrentVisitor(null);
-    setCurrentUserId('');
+    setCurrentUserId(operator.id);
     setOperatorAccessGranted(true);
     setBoyAccessGranted(false);
     setVisitorAccessGranted(false);
@@ -468,47 +460,54 @@ export default function FantaMasMockup() {
 
     saveSession({
       role: 'operator',
-      userId: data.id,
+      userId: operator.id,
       accessGranted: true,
     });
+  } catch (err) {
+    console.error('Eccezione login operatore', err);
+    alert('Errore durante il login operatore');
   }
+}
 
   async function submitVisitorLogin() {
-    const username = visitorUsernameInput.trim().toLowerCase();
-    const password = visitorPasswordInput.trim();
+  const username = visitorUsernameInput.trim().toLowerCase();
+  const password = visitorPasswordInput.trim();
 
-    if (!username || !password) {
-      alert('Inserisci username e password');
-      return;
-    }
+  if (!username || !password) {
+    alert('Inserisci username e password');
+    return;
+  }
 
-    const { data, error } = await supabase
-      .from('visitors')
-      .select('id, name, username, password, active')
-      .eq('username', username)
-      .eq('active', true)
-      .maybeSingle();
+  try {
+    const { data, error } = await supabase.functions.invoke('login-visitor', {
+      body: {
+        username,
+        password,
+      },
+    });
 
     if (error) {
-      console.error('Errore login visitatore', error);
+      console.error('Errore invoke login-visitor', error);
       alert('Errore durante il login visitatore');
       return;
     }
 
-    if (!data || String(data.password).trim() !== password) {
-      alert('Credenziali visitatore non corrette');
+    if (!data?.ok || !data?.visitor) {
+      alert(data?.error || 'Credenziali visitatore non corrette');
       return;
     }
 
+    const visitor = data.visitor;
+
     setCurrentVisitor({
-      id: data.id,
-      name: data.name,
+      id: visitor.id,
+      name: visitor.name,
       role: 'visitor',
-      username: data.username,
+      username: visitor.username,
     });
 
     setCurrentOperator(null);
-    setCurrentUserId('');
+    setCurrentUserId(visitor.id);
     setVisitorAccessGranted(true);
     setBoyAccessGranted(false);
     setOperatorAccessGranted(false);
@@ -518,10 +517,14 @@ export default function FantaMasMockup() {
 
     saveSession({
       role: 'visitor',
-      userId: data.id,
+      userId: visitor.id,
       accessGranted: true,
     });
+  } catch (err) {
+    console.error('Eccezione login visitatore', err);
+    alert('Errore durante il login visitatore');
   }
+}
 
   function logoutOperator() {
     setOperatorAccessGranted(false);
@@ -573,79 +576,126 @@ export default function FantaMasMockup() {
     clearSession();
   }
 
-  function submitBoyPassword() {
-    const user = appState.users.find(item => item.id === currentUserId && item.role === 'boy');
-    if (!user) return;
+async function submitBoyPassword() {
+  const username = boyUsernameInput.trim().toLowerCase();
+  const password = boyPasswordInput.trim();
 
-    if (boyPasswordInput.trim() === String(user.password || '').trim()) {
-      setBoyAccessGranted(true);
-      setOperatorAccessGranted(false);
-      setVisitorAccessGranted(false);
-      setCurrentOperator(null);
-      setCurrentVisitor(null);
-      setBoyPasswordInput('');
-      setScreen('boy-home');
+  if (!username || !password) {
+    alert('Inserisci username e password');
+    return;
+  }
 
-      saveSession({
-        role: 'boy',
-        userId: user.id,
-        accessGranted: true,
-      });
+  try {
+    const { data, error } = await supabase.functions.invoke('login-boy', {
+      body: {
+        username,
+        password,
+      },
+    });
 
+    if (error) {
+      console.error('Errore invoke login-boy', error);
+      alert('Errore durante il login ragazzo');
       return;
     }
 
-    alert('Password ragazzo non corretta');
+    if (!data?.ok || !data?.boy) {
+      alert(data?.error || 'Credenziali ragazzo non corrette');
+      return;
+    }
+
+    const boy = data.boy;
+
+    setCurrentUserId(boy.id);
+    setBoyAccessGranted(true);
+    setOperatorAccessGranted(false);
+    setVisitorAccessGranted(false);
+    setCurrentOperator(null);
+    setCurrentVisitor(null);
+    setBoyUsernameInput('');
+    setBoyPasswordInput('');
+    setScreen('boy-home');
+
+    saveSession({
+      role: 'boy',
+      userId: boy.id,
+      accessGranted: true,
+    });
+  } catch (err) {
+    console.error('Eccezione login ragazzo', err);
+    alert('Errore durante il login ragazzo');
   }
+}
 
   async function saveBoyAvatar() {
-    if (!currentUserId || !selectedAvatarKey) return;
+  if (!currentUserId || !selectedAvatarKey) return;
 
-    const { error } = await supabase
-      .from('boys')
-      .update({ avatar_key: selectedAvatarKey })
-      .eq('id', currentUserId);
+  try {
+    const { data, error } = await supabase.functions.invoke('save-boy-avatar', {
+      body: {
+        boyId: currentUserId,
+        avatarKey: selectedAvatarKey,
+      },
+    });
 
     if (error) {
-      console.error('Errore salvataggio avatar', error);
+      console.error('Errore invoke save-boy-avatar', error);
       alert('Errore durante il salvataggio dell’avatar');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante il salvataggio dell’avatar');
       return;
     }
 
     await loadSupabaseData();
     setScreen('boy-home');
+  } catch (err) {
+    console.error('Eccezione salvataggio avatar', err);
+    alert('Errore durante il salvataggio dell’avatar');
   }
+}
 
   async function changeBoyPassword() {
-    const user = appState.users.find(item => item.id === currentUserId && item.role === 'boy');
-    if (!user) return;
+  const currentPassword = currentBoyPasswordInput.trim();
+  const nextPassword = newBoyPasswordInput.trim();
+  const confirmPassword = confirmBoyPasswordInput.trim();
 
-    const currentPassword = currentBoyPasswordInput.trim();
-    const nextPassword = newBoyPasswordInput.trim();
-    const confirmPassword = confirmBoyPasswordInput.trim();
+  if (!currentUserId) return;
 
-    if (currentPassword !== String(user.password || '').trim()) {
-      alert('Password attuale non corretta');
-      return;
-    }
+  if (!currentPassword) {
+    alert('Inserisci la password attuale');
+    return;
+  }
 
-    if (!nextPassword) {
-      alert('Inserisci una nuova password');
-      return;
-    }
+  if (!nextPassword) {
+    alert('Inserisci una nuova password');
+    return;
+  }
 
-    if (nextPassword !== confirmPassword) {
-      alert('Le nuove password non coincidono');
-      return;
-    }
+  if (nextPassword !== confirmPassword) {
+    alert('Le nuove password non coincidono');
+    return;
+  }
 
-    const { error } = await supabase
-      .from('boys')
-      .update({ password: nextPassword })
-      .eq('id', user.id);
+  try {
+    const { data, error } = await supabase.functions.invoke('change-boy-password', {
+      body: {
+        boyId: currentUserId,
+        currentPassword,
+        newPassword: nextPassword,
+      },
+    });
 
     if (error) {
-      console.error('Errore cambio password ragazzo', error);
+      console.error('Errore invoke change-boy-password', error);
+      alert('Errore durante il cambio password ragazzo');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante il cambio password ragazzo');
       return;
     }
 
@@ -655,46 +705,62 @@ export default function FantaMasMockup() {
     await loadSupabaseData();
     alert('Password aggiornata');
     setScreen('boy-home');
+  } catch (err) {
+    console.error('Eccezione cambio password ragazzo', err);
+    alert('Errore durante il cambio password ragazzo');
   }
+}
 
   async function updateBoyPassword() {
-    const cleanPassword = newBoyPassword.trim();
-    if (!passwordBoyId || !cleanPassword) return;
+  const cleanPassword = newBoyPassword.trim();
+  if (!passwordBoyId || !cleanPassword) return;
 
-    const { error } = await supabase
-      .from('boys')
-      .update({ password: cleanPassword })
-      .eq('id', passwordBoyId);
+  try {
+    const { data, error } = await supabase.functions.invoke('reset-boy-password', {
+      body: {
+        boyId: passwordBoyId,
+        newPassword: cleanPassword,
+      },
+    });
 
     if (error) {
-      console.error('Errore modifica password ragazzo', error);
+      console.error('Errore invoke reset-boy-password', error);
+      alert('Errore durante la modifica password ragazzo');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante la modifica password ragazzo');
       return;
     }
 
     setNewBoyPassword('');
     await loadSupabaseData();
+  } catch (err) {
+    console.error('Eccezione modifica password ragazzo', err);
+    alert('Errore durante la modifica password ragazzo');
   }
+}
 
   async function submitRequest() {
-    if (!currentUser || !selectedRule) return;
+  if (!currentUser?.id || !selectedRule?.id) return;
 
-    const newRequest = {
-      id: `req-${Date.now()}`,
-      user_id: currentUser.id,
-      user_name: currentUser.name,
-      rule_id: selectedRule.id,
-      activity: selectedRule.label,
-      points: selectedRule.points,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-      note: '',
-      decided_by: '',
-    };
-
-    const { error } = await supabase.from('requests').insert(newRequest);
+  try {
+    const { data, error } = await supabase.functions.invoke('submit-request', {
+      body: {
+        userId: currentUser.id,
+        ruleId: selectedRule.id,
+      },
+    });
 
     if (error) {
-      console.error('Errore invio richiesta', error);
+      console.error('Errore invoke submit-request', error);
+      alert('Errore durante l’invio della richiesta');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante l’invio della richiesta');
       return;
     }
 
@@ -702,44 +768,41 @@ export default function FantaMasMockup() {
     setSelectedRuleId('');
     await loadSupabaseData();
     setScreen('boy-requests');
+  } catch (err) {
+    console.error('Eccezione invio richiesta', err);
+    alert('Errore durante l’invio della richiesta');
   }
+}
 
   async function decideRequest(requestId, action) {
-    if (!currentUser) return;
+  if (!currentUser?.name) return;
 
-    let payload = null;
-
-    if (action === 'approve') {
-      payload = {
-        status: 'approved',
-        decided_by: currentUser.name,
-        note: '',
-      };
-    }
-
-    if (action === 'reject') {
-      payload = {
-        status: 'rejected',
-        decided_by: currentUser.name,
-        note: 'Non confermato',
-      };
-    }
-
-    if (!payload) return;
-
-    const { error } = await supabase
-      .from('requests')
-      .update(payload)
-      .eq('id', requestId)
-      .eq('status', 'pending');
+  try {
+    const { data, error } = await supabase.functions.invoke('decide-request', {
+      body: {
+        requestId,
+        action,
+        decidedBy: currentUser.name,
+      },
+    });
 
     if (error) {
-      console.error('Errore decisione richiesta', error);
+      console.error('Errore invoke decide-request', error);
+      alert('Errore durante la decisione della richiesta');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante la decisione della richiesta');
       return;
     }
 
     await loadSupabaseData();
+  } catch (err) {
+    console.error('Eccezione decisione richiesta', err);
+    alert('Errore durante la decisione della richiesta');
   }
+}
 
   function startModify(request) {
     setModifyDraft({
@@ -750,160 +813,129 @@ export default function FantaMasMockup() {
   }
 
   async function saveModify() {
-    if (!modifyDraft.requestId || !currentUser) return;
+  if (!modifyDraft.requestId || !currentUser?.name) return;
 
-    const parsedPoints = Number(modifyDraft.finalPoints);
-    if (Number.isNaN(parsedPoints)) return;
+  const parsedPoints = Number(modifyDraft.finalPoints);
+  if (Number.isNaN(parsedPoints)) return;
 
-    const { error } = await supabase
-      .from('requests')
-      .update({
-        status: 'modified',
-        final_points: parsedPoints,
+  try {
+    const { data, error } = await supabase.functions.invoke('modify-request', {
+      body: {
+        requestId: modifyDraft.requestId,
+        finalPoints: parsedPoints,
         note: modifyDraft.note,
-        decided_by: currentUser.name,
-      })
-      .eq('id', modifyDraft.requestId)
-      .eq('status', 'pending');
+        decidedBy: currentUser.name,
+      },
+    });
 
     if (error) {
-      console.error('Errore modifica richiesta', error);
+      console.error('Errore invoke modify-request', error);
+      alert('Errore durante la modifica della richiesta');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante la modifica della richiesta');
       return;
     }
 
     setModifyDraft({ requestId: '', finalPoints: '', note: '' });
     await loadSupabaseData();
+  } catch (err) {
+    console.error('Eccezione modifica richiesta', err);
+    alert('Errore durante la modifica della richiesta');
   }
+}
 
   async function addNewBoy() {
-    const cleanName = newBoyName.trim();
-    if (!cleanName) return;
+  const cleanName = newBoyName.trim();
+  if (!cleanName) return;
 
-    const normalizedId = cleanName
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
-    const finalId = normalizedId || `ragazzo-${Date.now()}`;
-
-    const alreadyExists = appState.users.some(
-      user => user.role === 'boy' && (user.id === finalId || user.name.toLowerCase() === cleanName.toLowerCase())
-    );
-
-    if (alreadyExists) return;
-
-    const { error } = await supabase.from('boys').insert({
-      id: finalId,
-      name: cleanName,
-      role: 'boy',
-      password: '1234',
+  try {
+    const { data, error } = await supabase.functions.invoke('add-boy', {
+      body: {
+        name: cleanName,
+      },
     });
 
     if (error) {
-      console.error('Errore aggiunta ragazzo', error);
+      console.error('Errore invoke add-boy', error);
+      alert('Errore durante l’aggiunta del ragazzo');
+      return;
+    }
+
+    if (!data?.ok || !data?.boy) {
+      alert(data?.error || 'Errore durante l’aggiunta del ragazzo');
       return;
     }
 
     setNewBoyName('');
-    setOperatorTargetUserId(finalId);
+    setOperatorTargetUserId(data.boy.id);
     await loadSupabaseData();
+  } catch (err) {
+    console.error('Eccezione aggiunta ragazzo', err);
+    alert('Errore durante l’aggiunta del ragazzo');
   }
+}
 
   async function deleteBoy() {
-    if (!deleteBoyId) return;
+  if (!deleteBoyId) return;
 
-    const userToDelete = appState.users.find(user => user.id === deleteBoyId);
-    if (!userToDelete || userToDelete.role !== 'boy') return;
+  const userToDelete = appState.users.find(user => user.id === deleteBoyId);
+  if (!userToDelete || userToDelete.role !== 'boy') return;
 
-    const { error } = await supabase
-      .from('boys')
-      .delete()
-      .eq('id', deleteBoyId);
+  try {
+    const { data, error } = await supabase.functions.invoke('delete-boy', {
+      body: {
+        boyId: deleteBoyId,
+      },
+    });
 
     if (error) {
-      console.error('Errore eliminazione ragazzo', error);
+      console.error('Errore invoke delete-boy', error);
+      alert('Errore durante l’eliminazione del ragazzo');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante l’eliminazione del ragazzo');
       return;
     }
 
     setDeleteBoyId('');
     await loadSupabaseData();
+  } catch (err) {
+    console.error('Eccezione eliminazione ragazzo', err);
+    alert('Errore durante l’eliminazione del ragazzo');
   }
+}
 
   async function addNewRule() {
-    const category = newRuleCategory.trim();
-    const label = newRuleLabel.trim();
-    const rawPoints = Number(newRulePoints);
+  const category = newRuleCategory.trim();
+  const label = newRuleLabel.trim();
+  const rawPoints = Number(newRulePoints);
 
-    if (!category || !label || Number.isNaN(rawPoints)) return;
+  if (!category || !label || Number.isNaN(rawPoints)) return;
 
-    const points = newRuleKind === 'malus' ? -Math.abs(rawPoints) : Math.abs(rawPoints);
-
-    const normalizedId = `${category}-${label}`
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
-    const finalId = normalizedId || `regola-${Date.now()}`;
-
-    const alreadyExists = appState.rules.some(
-      rule => rule.id === finalId || rule.label.toLowerCase() === label.toLowerCase()
-    );
-
-    if (alreadyExists) return;
-
-    const colorByCategory = {
-      pulizia: 'sky',
-      pranzo: 'orange',
-      rifiuti: 'emerald',
-      cucina: 'amber',
-      uscite: 'cyan',
-      spesa: 'cyan',
-      didattica: 'violet',
-      podcast: 'violet',
-      laboratori: 'violet',
-      cura: 'teal',
-      attenzione: 'rose',
-    };
-
-    const iconByCategory = {
-      pulizia: '🧹',
-      pranzo: '🍽️',
-      rifiuti: '♻️',
-      cucina: '🍳',
-      uscite: '🛒',
-      spesa: '🛒',
-      didattica: '🎙️',
-      podcast: '🎙️',
-      laboratori: '🎙️',
-      cura: '👕',
-      attenzione: '⚠️',
-    };
-
-    const categoryKey = category.toLowerCase();
-    const matchedColor =
-      Object.keys(colorByCategory).find(key => categoryKey.includes(key));
-    const matchedIcon =
-      Object.keys(iconByCategory).find(key => categoryKey.includes(key));
-
-    const newRule = {
-      id: finalId,
-      category,
-      label,
-      points,
-      kind: newRuleKind,
-      boy_selectable: newRuleSelectable,
-      icon: matchedIcon ? iconByCategory[matchedIcon] : (newRuleKind === 'malus' ? '⚠️' : '⭐'),
-      color: matchedColor ? colorByCategory[matchedColor] : (newRuleKind === 'malus' ? 'rose' : 'orange'),
-    };
-
-    const { error } = await supabase.from('rules').insert(newRule);
+  try {
+    const { data, error } = await supabase.functions.invoke('add-rule-safe', {
+      body: {
+        category,
+        label,
+        points: rawPoints,
+        kind: newRuleKind,
+        boySelectable: newRuleSelectable,
+      },
+    });
 
     if (error) {
-      console.error('Errore aggiunta regola', error);
+      console.error('Errore invoke add-rule', error);
+      alert('Errore durante l’aggiunta della regola');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante l’aggiunta della regola');
       return;
     }
 
@@ -914,224 +946,241 @@ export default function FantaMasMockup() {
     setNewRuleSelectable(true);
 
     await loadSupabaseData();
+  } catch (err) {
+    console.error('Eccezione aggiunta regola', err);
+    alert('Errore durante l’aggiunta della regola');
   }
+}
 
   async function deleteRule() {
-    if (!deleteRuleId) return;
+  if (!deleteRuleId) return;
 
-    const { error } = await supabase
-      .from('rules')
-      .delete()
-      .eq('id', deleteRuleId);
+  try {
+    const { data, error } = await supabase.functions.invoke('delete-rule', {
+      body: {
+        ruleId: deleteRuleId,
+      },
+    });
 
     if (error) {
-      console.error('Errore eliminazione regola', error);
+      console.error('Errore invoke delete-rule', error);
+      alert('Errore durante l’eliminazione della regola');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante l’eliminazione della regola');
       return;
     }
 
     setDeleteRuleId('');
     await loadSupabaseData();
+  } catch (err) {
+    console.error('Eccezione eliminazione regola', err);
+    alert('Errore durante l’eliminazione della regola');
   }
+}
 
   async function updateRule() {
-    if (!editRuleId) return;
+  if (!editRuleId) return;
 
-    const category = editRuleCategory.trim();
-    const label = editRuleLabel.trim();
-    const rawPoints = Number(editRulePoints);
+  const category = editRuleCategory.trim();
+  const label = editRuleLabel.trim();
+  const rawPoints = Number(editRulePoints);
 
-    if (!category || !label || Number.isNaN(rawPoints)) return;
+  if (!category || !label || Number.isNaN(rawPoints)) return;
 
-    const points = editRuleKind === 'malus' ? -Math.abs(rawPoints) : Math.abs(rawPoints);
-
-    const colorByCategory = {
-      pulizia: 'sky',
-      pranzo: 'orange',
-      rifiuti: 'emerald',
-      cucina: 'amber',
-      uscite: 'cyan',
-      spesa: 'cyan',
-      didattica: 'violet',
-      podcast: 'violet',
-      laboratori: 'violet',
-      cura: 'teal',
-      attenzione: 'rose',
-    };
-
-    const iconByCategory = {
-      pulizia: '🧹',
-      pranzo: '🍽️',
-      rifiuti: '♻️',
-      cucina: '🍳',
-      uscite: '🛒',
-      spesa: '🛒',
-      didattica: '🎙️',
-      podcast: '🎙️',
-      laboratori: '🎙️',
-      cura: '👕',
-      attenzione: '⚠️',
-    };
-
-    const categoryKey = category.toLowerCase();
-    const matchedColor =
-      Object.keys(colorByCategory).find(key => categoryKey.includes(key));
-    const matchedIcon =
-      Object.keys(iconByCategory).find(key => categoryKey.includes(key));
-
-    const { error } = await supabase
-      .from('rules')
-      .update({
+  try {
+    const { data, error } = await supabase.functions.invoke('update-rule', {
+      body: {
+        ruleId: editRuleId,
         category,
         label,
-        points,
+        points: rawPoints,
         kind: editRuleKind,
-        boy_selectable: editRuleSelectable,
-        icon: matchedIcon ? iconByCategory[matchedIcon] : (editRuleKind === 'malus' ? '⚠️' : '⭐'),
-        color: matchedColor ? colorByCategory[matchedColor] : (editRuleKind === 'malus' ? 'rose' : 'orange'),
-      })
-      .eq('id', editRuleId);
+        boySelectable: editRuleSelectable,
+      },
+    });
 
     if (error) {
-      console.error('Errore modifica regola', error);
+      console.error('Errore invoke update-rule', error);
+      alert('Errore durante la modifica della regola');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante la modifica della regola');
       return;
     }
 
     await loadSupabaseData();
+  } catch (err) {
+    console.error('Eccezione modifica regola', err);
+    alert('Errore durante la modifica della regola');
   }
+}
 
   async function deleteRequest(requestId) {
-    if (!requestId) return;
+  if (!requestId) return;
 
-    const confirmed = window.confirm('Vuoi davvero eliminare questo movimento?');
-    if (!confirmed) return;
+  const confirmed = window.confirm('Vuoi davvero eliminare questo movimento?');
+  if (!confirmed) return;
 
-    const { error } = await supabase
-      .from('requests')
-      .delete()
-      .eq('id', requestId);
+  try {
+    const { data, error } = await supabase.functions.invoke('delete-request', {
+      body: {
+        requestId,
+      },
+    });
 
     if (error) {
-      console.error('Errore eliminazione movimento', error);
+      console.error('Errore invoke delete-request', error);
+      alert('Errore durante l’eliminazione del movimento');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante l’eliminazione del movimento');
       return;
     }
 
     await loadSupabaseData();
+  } catch (err) {
+    console.error('Eccezione eliminazione movimento', err);
+    alert('Errore durante l’eliminazione del movimento');
   }
+}
 
   async function updateBoy() {
-    const cleanName = editBoyName.trim();
-    if (!editBoyId || !cleanName) return;
+  const cleanName = editBoyName.trim();
+  if (!editBoyId || !cleanName) return;
 
-    const duplicateName = appState.users.some(
-      user =>
-        user.role === 'boy' &&
-        user.id !== editBoyId &&
-        user.name.toLowerCase() === cleanName.toLowerCase()
-    );
+  try {
+    const { data, error } = await supabase.functions.invoke('update-boy', {
+      body: {
+        boyId: editBoyId,
+        name: cleanName,
+      },
+    });
 
-    if (duplicateName) return;
-
-    const { error: boyError } = await supabase
-      .from('boys')
-      .update({ name: cleanName })
-      .eq('id', editBoyId);
-
-    if (boyError) {
-      console.error('Errore modifica ragazzo', boyError);
+    if (error) {
+      console.error('Errore invoke update-boy', error);
+      alert('Errore durante la modifica del ragazzo');
       return;
     }
 
-    const { error: requestsError } = await supabase
-      .from('requests')
-      .update({ user_name: cleanName })
-      .eq('user_id', editBoyId);
-
-    if (requestsError) {
-      console.error('Errore aggiornamento richieste del ragazzo', requestsError);
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante la modifica del ragazzo');
       return;
     }
 
     await loadSupabaseData();
+  } catch (err) {
+    console.error('Eccezione modifica ragazzo', err);
+    alert('Errore durante la modifica del ragazzo');
   }
+}
 
-  async function addManualOperatorEntry() {
-    const user = appState.users.find(item => item.id === operatorTargetUserId);
-    const rule = appState.rules.find(item => item.id === operatorRuleId);
-    if (!user || !rule || !currentUser) return;
+async function addManualOperatorEntry() {
+  if (!currentUser?.name) return;
 
-    const newRequest = {
-      id: `req-${Date.now()}`,
-      user_id: user.id,
-      user_name: user.name,
-      rule_id: rule.id,
-      activity: rule.label,
-      points: rule.points,
-      status: 'approved',
-      created_at: new Date().toISOString(),
-      note: operatorNote,
-      decided_by: currentUser.name,
-    };
-
-    const { error } = await supabase.from('requests').insert(newRequest);
+  try {
+    const { data, error } = await supabase.functions.invoke('add-manual-entry', {
+      body: {
+        userId: operatorTargetUserId,
+        ruleId: operatorRuleId,
+        note: operatorNote,
+        decidedBy: currentUser.name,
+      },
+    });
 
     if (error) {
-      console.error('Errore inserimento manuale', error);
+      console.error('Errore invoke add-manual-entry', error);
+      alert('Errore durante l’inserimento manuale');
+      return;
+    }
+
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante l’inserimento manuale');
       return;
     }
 
     setOperatorNote('');
     await loadSupabaseData();
     setScreen('operator-history');
+  } catch (err) {
+    console.error('Eccezione inserimento manuale', err);
+    alert('Errore durante l’inserimento manuale');
   }
+}
 
 async function addArbitraryManualAdjustment({ userId, points, reason }) {
-  const user = appState.users.find(item => item.id === userId && item.role === 'boy');
-  if (!user || !currentUser) return;
+  if (!currentUser?.name) return;
 
-  const newRequest = {
-    id: `req-${Date.now()}`,
-    user_id: user.id,
-    user_name: user.name,
-    rule_id: 'manual-adjustment',
-    activity: 'Bonus/Malus manuale',
-    points: Number(points),
-    status: 'approved',
-    created_at: new Date().toISOString(),
-    note: reason?.trim() || '',
-    decided_by: currentUser.name,
-  };
+  try {
+    const { data, error } = await supabase.functions.invoke('add-manual-adjustment', {
+      body: {
+        userId,
+        points: Number(points),
+        reason: reason?.trim() || '',
+        decidedBy: currentUser.name,
+      },
+    });
 
-  const { error } = await supabase.from('requests').insert(newRequest);
+    if (error) {
+      console.error('Errore invoke add-manual-adjustment', error);
+      alert('Errore durante il bonus/malus manuale');
+      return;
+    }
 
-  if (error) {
-    console.error('Errore inserimento bonus/malus manuale', error);
-    alert(`Errore bonus/malus: ${error.message}`);
-    return;
+    if (!data?.ok) {
+      alert(data?.error || 'Errore durante il bonus/malus manuale');
+      return;
+    }
+
+    await loadSupabaseData();
+    setScreen('operator-history');
+  } catch (err) {
+    console.error('Eccezione bonus/malus manuale', err);
+    alert('Errore durante il bonus/malus manuale');
   }
-
-  await loadSupabaseData();
-  setScreen('operator-history');
 }
 
   if (screen === 'landing') {
     return (
       <LandingScreen
         users={appState.users}
-        loginAs={loginAs}
-        goToOperatorLogin={() => setScreen('operator-login')}
-        goToVisitorLogin={() => setScreen('visitor-login')}
+        goToBoyLogin={() => {
+          setBoyUsernameInput('');
+          setBoyPasswordInput('');
+          setCurrentUserId('');
+          setScreen('boy-login');
+        }}
+        goToOperatorLogin={() => {
+          setOperatorUsernameInput('');
+          setOperatorPasswordInput('');
+          setScreen('operator-login');
+        }}
+        goToVisitorLogin={() => {
+          setVisitorUsernameInput('');
+          setVisitorPasswordInput('');
+          setScreen('visitor-login');
+        }}
       />
     );
   }
 
-  if (screen === 'boy-login' && currentUser) {
+  if (screen === 'boy-login') {
     return (
       <BoyLoginScreen
         currentUser={currentUser}
+        boyUsernameInput={boyUsernameInput}
+        setBoyUsernameInput={setBoyUsernameInput}
         boyPasswordInput={boyPasswordInput}
         setBoyPasswordInput={setBoyPasswordInput}
         submitBoyPassword={submitBoyPassword}
         onBack={() => {
+          setBoyUsernameInput('');
           setBoyPasswordInput('');
           setCurrentUserId('');
           setScreen('landing');
