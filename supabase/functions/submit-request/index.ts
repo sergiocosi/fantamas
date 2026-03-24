@@ -18,16 +18,21 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 Deno.serve(async req => {
+  console.log('submit-request method:', req.method)
+
   if (req.method === 'OPTIONS') {
+    console.log('submit-request OPTIONS ok')
     return jsonResponse({ ok: true }, 200)
   }
 
   if (req.method !== 'POST') {
+    console.log('submit-request method not allowed:', req.method)
     return jsonResponse({ error: 'Method not allowed' }, 405)
   }
 
   try {
     const { userId, ruleId }: Payload = await req.json()
+    console.log('submit-request payload received', { userId, ruleId })
 
     const cleanUserId = String(userId || '').trim()
     const cleanRuleId = String(ruleId || '').trim()
@@ -75,6 +80,14 @@ Deno.serve(async req => {
       return jsonResponse({ error: 'Regola non trovata' }, 404)
     }
 
+    if (rule.points === null || rule.points === undefined) {
+      return jsonResponse({ error: 'La regola selezionata non ha un punteggio valido' }, 400)
+    }
+
+    if (!rule.label) {
+      return jsonResponse({ error: 'La regola selezionata non ha una label valida' }, 400)
+    }
+
     const newRequest = {
       id: `req-${Date.now()}`,
       user_id: boy.id,
@@ -88,6 +101,8 @@ Deno.serve(async req => {
       decided_by: '',
     }
 
+    console.log('submit-request inserting request', newRequest)
+
     const { error: insertError } = await supabase
       .from('requests')
       .insert(newRequest)
@@ -96,6 +111,8 @@ Deno.serve(async req => {
       console.error('Errore insert request:', insertError)
       return jsonResponse({ error: insertError.message || 'Errore inserimento richiesta' }, 500)
     }
+
+    console.log('submit-request insert ok', { requestId: newRequest.id })
 
     return jsonResponse({
       ok: true,

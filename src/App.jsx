@@ -101,6 +101,7 @@ export default function FantaMasMockup() {
   const [visitorPasswordInput, setVisitorPasswordInput] = useState('');
   const [visitorAccessGranted, setVisitorAccessGranted] = useState(false);
   const [currentVisitor, setCurrentVisitor] = useState(null);
+  const [sessionRestored, setSessionRestored] = useState(false);
   const [selectedAvatarKey, setSelectedAvatarKey] = useState('');
 
   useEffect(() => {
@@ -691,7 +692,7 @@ async function submitBoyPassword() {
   }
 }
 
-  async function submitRequest() {
+async function submitRequest() {
   if (!currentUser?.id || !selectedRule?.id) return;
 
   try {
@@ -704,12 +705,13 @@ async function submitBoyPassword() {
 
     if (error) {
       console.error('Errore invoke submit-request', error);
-      alert('Errore durante l’invio della richiesta');
+      alert(`Errore invoke submit-request: ${error.message || JSON.stringify(error)}`);
       return;
     }
 
     if (!data?.ok) {
-      alert(data?.error || 'Errore durante l’invio della richiesta');
+      console.error('submit-request KO:', data);
+      alert(`Errore durante l’invio della richiesta: ${data?.error || 'errore sconosciuto'}`);
       return;
     }
 
@@ -719,7 +721,7 @@ async function submitBoyPassword() {
     setScreen('boy-requests');
   } catch (err) {
     console.error('Eccezione invio richiesta', err);
-    alert('Errore durante l’invio della richiesta');
+    alert(`Errore durante l’invio della richiesta: ${err.message || err}`);
   }
 }
 
