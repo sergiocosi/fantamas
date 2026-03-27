@@ -47,7 +47,7 @@ export default function LandingScreen({ users, goToBoyLogin, goToOperatorLogin, 
 
         <Card className="bg-slate-50 border-slate-200">
           <div className="text-5xl mb-4">🧑‍🏫</div>
-          <div className="text-2xl font-bold mb-2">Area Operatori</div>
+          <div className="text-2xl font-bold mb-2" translate="no">Area Operatori</div>
           <p className="text-neutral-700 mb-5 text-base leading-6">
             Gli operatori verificano le richieste e possono aggiungere bonus o malus manualmente.
           </p>
