@@ -7,6 +7,7 @@ export default function OperatorHomeScreen({
   onLogout,
   goToRequests,
   goToManual,
+  goToManage,
   goToHistory,
   goToLeaderboard,
   setScreen,
@@ -31,17 +32,38 @@ export default function OperatorHomeScreen({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4">
-        <ActionButton onClick={goToRequests}>
-          <div className="text-3xl mb-2">✅</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-4">
+        <ActionButton
+          onClick={goToRequests}
+          className={pendingRequests.length > 0 ? 'bg-orange-50 border-orange-300' : ''}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-3xl mb-2">✅</div>
+            {pendingRequests.length > 0 && (
+              <div className="min-w-8 h-8 px-2 rounded-full bg-orange-500 text-white font-black flex items-center justify-center">
+                {pendingRequests.length}
+              </div>
+            )}
+          </div>
           <div className="font-semibold">Verifica richieste</div>
-          <div className="text-sm text-neutral-600">Approva, modifica o rifiuta</div>
+          <div className="text-sm text-neutral-600">
+            {pendingRequests.length === 0
+              ? 'Nessuna richiesta in attesa'
+              : pendingRequests.length === 1
+                ? '1 richiesta da verificare'
+                : `${pendingRequests.length} richieste da verificare`}
+          </div>
         </ActionButton>
 
         <ActionButton onClick={goToManual}>
           <div className="text-3xl mb-2">✍️</div>
-          <div className="font-semibold">Aggiungi bonus / malus</div>
-          <div className="text-sm text-neutral-600">Inserimento manuale</div>
+          <div className="font-semibold">Punti extra</div>
+          <div className="text-sm text-neutral-600">Bonus e malus manuali</div>
+        </ActionButton>
+        <ActionButton onClick={goToManage}>
+          <div className="text-3xl mb-2">⚙️</div>
+          <div className="font-semibold">Gestione</div>
+          <div className="text-sm text-neutral-600">Ragazzi, regole e password</div>
         </ActionButton>
 
         <ActionButton onClick={goToHistory}>

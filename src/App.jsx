@@ -41,8 +41,8 @@ export default function FantaMasMockup() {
   const [currentUserId, setCurrentUserId] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedRuleId, setSelectedRuleId] = useState('');
-  const [operatorTargetUserId, setOperatorTargetUserId] = useState('marco');
-  const [operatorRuleId, setOperatorRuleId] = useState('rifiuto-partecipare');
+  const [operatorTargetUserId, setOperatorTargetUserId] = useState('');
+  const [operatorRuleId, setOperatorRuleId] = useState('');
   const [operatorNote, setOperatorNote] = useState('');
   const [newBoyName, setNewBoyName] = useState('');
   const [boyPasswordInput, setBoyPasswordInput] = useState('');
@@ -58,7 +58,7 @@ export default function FantaMasMockup() {
   const [newRulePoints, setNewRulePoints] = useState('');
   const [newRuleKind, setNewRuleKind] = useState('bonus');
   const [newRuleSelectable, setNewRuleSelectable] = useState(true);
-  const [deleteBoyId, setDeleteBoyId] = useState('marco');
+  const [deleteBoyId, setDeleteBoyId] = useState('');
   const [deleteRuleId, setDeleteRuleId] = useState('');
   const [editRuleId, setEditRuleId] = useState('');
   const [editRuleCategory, setEditRuleCategory] = useState('');
@@ -252,12 +252,6 @@ export default function FantaMasMockup() {
       setPasswordBoyId(boysList[0].id);
     }
   }, [appState.users, passwordBoyId]);
-
-  useEffect(() => {
-    if (!deleteRuleId && appState.rules.length > 0) {
-      setDeleteRuleId(appState.rules[0].id);
-    }
-  }, [appState.rules, deleteRuleId]);
 
   useEffect(() => {
     if (!editRuleId && appState.rules.length > 0) {
@@ -793,6 +787,12 @@ async function submitRequest() {
   const userToDelete = appState.users.find(user => user.id === deleteBoyId);
   if (!userToDelete || userToDelete.role !== 'boy') return;
 
+  const movements = appState.requests.filter(request => request.userId === deleteBoyId).length;
+  const confirmed = window.confirm(
+    `Vuoi davvero eliminare ${userToDelete.name}?\n\nVerranno cancellati anche tutti i suoi ${movements} movimenti (punti, richieste, storico).\nNon si può annullare.`
+  );
+  if (!confirmed) return;
+
   try {
     const { data, error } = await callApi('delete-boy', {
         boyId: deleteBoyId,
@@ -859,6 +859,12 @@ async function submitRequest() {
 
   async function deleteRule() {
   if (!deleteRuleId) return;
+
+  const ruleToDelete = appState.rules.find(rule => rule.id === deleteRuleId);
+  const confirmed = window.confirm(
+    `Vuoi davvero eliminare la regola "${ruleToDelete?.label || deleteRuleId}"?\n\nI punti già assegnati restano, ma i ragazzi non potranno più sceglierla.`
+  );
+  if (!confirmed) return;
 
   try {
     const { data, error } = await callApi('delete-rule', {
@@ -980,6 +986,11 @@ async function submitRequest() {
 
 async function addManualOperatorEntry() {
   if (!currentUser?.name) return;
+
+  if (!operatorTargetUserId || !operatorRuleId) {
+    alert('Seleziona il ragazzo e la voce');
+    return;
+  }
 
   try {
     const { data, error } = await callApi('add-manual-entry', {
@@ -1215,6 +1226,7 @@ if (screen === 'boy-leaderboard' && currentUser && boyAccessGranted) {
         onLogout={logoutOperator}
         goToRequests={() => setScreen('operator-requests')}
         goToManual={() => setScreen('operator-manual')}
+        goToManage={() => setScreen('operator-manage')}
         goToHistory={() => setScreen('operator-history')}
         goToLeaderboard={() => setScreen('operator-leaderboard')}
         setScreen={setScreen}
@@ -1237,10 +1249,10 @@ if (screen === 'boy-leaderboard' && currentUser && boyAccessGranted) {
       />
     );
   }
-
-  if (screen === 'operator-manual' && currentUser && operatorAccessGranted) {
+  if ((screen === 'operator-manual' || screen === 'operator-manage') && currentUser && operatorAccessGranted) {
     return (
       <OperatorManualScreen
+        section={screen === 'operator-manage' ? 'manage' : 'points'}
         currentUser={currentUser}
         appState={appState}
         operatorTargetUserId={operatorTargetUserId}
@@ -1298,6 +1310,7 @@ if (screen === 'boy-leaderboard' && currentUser && boyAccessGranted) {
       />
     );
   }
+
 
   if (screen === 'operator-history' && currentUser && operatorAccessGranted) {
     return (
