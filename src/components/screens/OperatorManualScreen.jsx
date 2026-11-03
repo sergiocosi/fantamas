@@ -58,6 +58,7 @@ export default function OperatorManualScreen({
   addManualOperatorEntry,
   addArbitraryManualAdjustment,
   goBack,
+  section = 'points',
 }) {
   const operatorRules = appState.rules.filter(
     rule => !rule.boySelectable || rule.kind === 'bonus'
@@ -95,15 +96,17 @@ export default function OperatorManualScreen({
   setAdjustmentReasonInput('');
 }
 
-return (
-  <Shell
-    title="Aggiunta manuale punti"
-    subtitle="Per bonus e malus decisi dagli operatori."
-    onBack={goBack}
-    currentUser={currentUser}
-  >
-    <div className="max-w-3xl">
-      <Card>
+if (section === 'manage') {
+  return (
+    <Shell
+      title="Gestione ragazzi e regole"
+      subtitle="Aggiungi, modifica o elimina ragazzi e attività."
+      onBack={goBack}
+      currentUser={currentUser}
+    >
+      <div className="max-w-3xl grid gap-6">
+        <Card>
+          <div className="text-2xl font-black mb-5">🧑‍🤝‍🧑 Ragazzi</div>
         <div className="mb-6 pb-6 border-b border-neutral-200">
           <div className="text-lg font-bold mb-3">Aggiungi un ragazzo</div>
           <div className="grid md:grid-cols-[1fr_auto] gap-3">
@@ -186,7 +189,7 @@ return (
           </div>
         </div>
 
-        <div className="mb-6 pb-6 border-b border-neutral-200">
+        <div>
           <div className="text-lg font-bold mb-3">Cambia password ragazzo</div>
 
           <div className="grid gap-4">
@@ -226,7 +229,10 @@ return (
             </div>
           </div>
         </div>
+        </Card>
 
+        <Card>
+          <div className="text-2xl font-black mb-5">📚 Regole</div>
         <div className="mb-6 pb-6 border-b border-neutral-200">
           <div className="text-lg font-bold mb-3">Aggiungi una regola</div>
 
@@ -321,7 +327,7 @@ return (
           </div>
         </div>
 
-        <div className="mb-6 pb-6 border-b border-neutral-200">
+        <div>
           <div className="text-lg font-bold mb-3">Modifica una regola</div>
 
           <div className="grid gap-4">
@@ -403,63 +409,22 @@ return (
             </div>
           </div>
         </div>
+        </Card>
+      </div>
+    </Shell>
+  );
+}
 
+return (
+  <Shell
+    title="Punti extra"
+    subtitle="Bonus e malus decisi dagli operatori."
+    onBack={goBack}
+    currentUser={currentUser}
+  >
+    <div className="max-w-3xl">
+      <Card>
         <div className="mb-6 pb-6 border-b border-neutral-200">
-          <div className="text-lg font-bold mb-3">Salva movimento da regola</div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-semibold text-neutral-700">Ragazzo</label>
-              <select
-                value={operatorTargetUserId}
-                onChange={event => setOperatorTargetUserId(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
-              >
-                {boys.map(user => (
-                  <option key={user.id} value={user.id}>
-                    {user.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold text-neutral-700">Voce</label>
-              <select
-                value={operatorRuleId}
-                onChange={event => setOperatorRuleId(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
-              >
-                {operatorRules.map(rule => (
-                  <option key={rule.id} value={rule.id}>
-                    {rule.category} — {rule.label} ({rule.points > 0 ? '+' : ''}{rule.points})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <label className="text-sm font-semibold text-neutral-700">Nota facoltativa</label>
-            <input
-              value={operatorNote}
-              onChange={event => setOperatorNote(event.target.value)}
-              className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
-              placeholder="Es. controllo entrata, comportamento, partecipazione parziale..."
-            />
-          </div>
-
-          <div className="mt-4">
-            <button
-              onClick={addManualOperatorEntry}
-              className="rounded-2xl px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-sm"
-            >
-              Salva movimento
-            </button>
-          </div>
-        </div>
-
-        <div>
           <div className="text-lg font-bold mb-3">Bonus / Malus manuale</div>
 
           <div className="grid md:grid-cols-2 gap-4">
@@ -508,6 +473,63 @@ return (
               className="rounded-2xl px-5 py-3 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold shadow-sm"
             >
               Applica bonus / malus
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div className="text-lg font-bold mb-3">Punti da una regola</div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-semibold text-neutral-700">Ragazzo</label>
+              <select
+                value={operatorTargetUserId}
+                onChange={event => setOperatorTargetUserId(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
+              >
+                <option value="">Seleziona ragazzo</option>
+                {boys.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-neutral-700">Voce</label>
+              <select
+                value={operatorRuleId}
+                onChange={event => setOperatorRuleId(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
+              >
+                <option value="">Seleziona voce</option>
+                {operatorRules.map(rule => (
+                  <option key={rule.id} value={rule.id}>
+                    {rule.category} — {rule.label} ({rule.points > 0 ? '+' : ''}{rule.points})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="text-sm font-semibold text-neutral-700">Nota facoltativa</label>
+            <input
+              value={operatorNote}
+              onChange={event => setOperatorNote(event.target.value)}
+              className="mt-1 w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm"
+              placeholder="Es. controllo entrata, comportamento, partecipazione parziale..."
+            />
+          </div>
+
+          <div className="mt-4">
+            <button
+              onClick={addManualOperatorEntry}
+              className="rounded-2xl px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-sm"
+            >
+              Salva movimento
             </button>
           </div>
         </div>
