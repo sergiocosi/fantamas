@@ -8,6 +8,7 @@ export default function OperatorRequestsScreen({
   modifyDraft,
   setModifyDraft,
   decideRequest,
+  approveAll,
   startModify,
   saveModify,
   goBack,
@@ -21,6 +22,16 @@ export default function OperatorRequestsScreen({
       currentUser={currentUser}
     >
       <div className="grid gap-3">
+        {pendingRequests.length > 1 && (
+          <div className="flex justify-end">
+            <button
+              onClick={approveAll}
+              className="rounded-2xl px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
+            >
+              ✅ Approva tutte ({pendingRequests.length})
+            </button>
+          </div>
+        )}
         {pendingRequests.length === 0 && <Card>Nessuna richiesta in attesa.</Card>}
 
         {pendingRequests.map(request => (
@@ -52,7 +63,7 @@ export default function OperatorRequestsScreen({
 
                 <button
                   onClick={() => startModify(request)}
-                  className="rounded-2xl px-4 py-2 bg-sky-600 text-white font-semibold shadow-sm"
+                  className="rounded-2xl px-4 py-2 bg-amber-500 text-white font-semibold shadow-sm"
                 >
                   Modifica
                 </button>

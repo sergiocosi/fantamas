@@ -9,6 +9,9 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const db = createClient(SUPABASE_URL, SERVICE_KEY)
 
 const TOKEN_DAYS = 60
+const FAMILY_LINK_DAYS = 365
+const PHOTO_BUCKET = 'avatars'
+const MAX_PHOTO_BYTES = 1_500_000
 const PBKDF2_ITERATIONS = 100_000
 
 // ---------- utilità ----------
@@ -130,8 +133,8 @@ async function sign(text: string) {
   return b64(await crypto.subtle.sign('HMAC', await hmacKey(), enc.encode(text)))
 }
 
-async function createToken(role: Session['role'], id: string) {
-  const payload = b64(enc.encode(JSON.stringify({ role, id, exp: Date.now() + TOKEN_DAYS * 86_400_000 })))
+async function createToken(role: Session['role'], id: string, days = TOKEN_DAYS) {
+  const payload = b64(enc.encode(JSON.stringify({ role, id, exp: Date.now() + days * 86_400_000 })))
   return `${payload}.${await sign(payload)}`
 }
 
@@ -164,6 +167,49 @@ async function requireOperator(token: unknown) {
   )
   if (!op || op.active !== true) fail(403, 'Operatore non attivo')
   return op
+}
+
+// Il ragazzo agisce su se stesso, l'operatore su qualunque ragazzo (boyId)
+async function requireBoyOrOperator(token: unknown, boyId: unknown) {
+  const s = await readToken(token)
+  if (s?.role === 'boy') return await requireBoy(token)
+  if (s?.role === 'operator') {
+    await requireOperator(token)
+    return await findBoy(boyId)
+  }
+  fail(403, 'Non autorizzato')
+}
+
+// ---------- foto ----------
+
+function photoPathFromUrl(url: string | null) {
+  const marker = `/${PHOTO_BUCKET}/`
+  const i = str(url).indexOf(marker)
+  return i >= 0 ? str(url).slice(i + marker.length) : ''
+}
+
+async function uploadToBucket(path: string, bytes: Uint8Array) {
+  const upload = () => db.storage.from(PHOTO_BUCKET).upload(path, bytes, { contentType: 'image/jpeg', upsert: true })
+  let { error } = await upload()
+  if (error && /not found/i.test(error.message)) {
+    // primo utilizzo: crea lo spazio per le foto
+    const created = await db.storage.createBucket(PHOTO_BUCKET, { public: true, fileSizeLimit: MAX_PHOTO_BYTES })
+    if (created.error && !/already exists/i.test(created.error.message)) {
+      console.error('Errore creazione bucket:', created.error)
+      fail(500, 'Errore preparazione spazio foto')
+    }
+    ;({ error } = await upload())
+  }
+  if (error) {
+    console.error('Errore upload foto:', error)
+    fail(500, 'Errore caricamento foto')
+  }
+  return db.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl
+}
+
+async function removeFromBucket(url: string | null) {
+  const path = photoPathFromUrl(url)
+  if (path) await db.storage.from(PHOTO_BUCKET).remove([path])
 }
 
 // ---------- login ----------
@@ -320,7 +366,41 @@ const actions: Record<string, Handler> = {
     return { ok: true }
   },
 
+  // --- foto: il ragazzo per sé, l'operatore per chiunque ---
+  'upload-photo': async body => {
+    const boy = await requireBoyOrOperator(body.token, body.boyId)
+    const match = /^data:image\/jpeg;base64,(.+)$/.exec(str(body.image))
+    if (!match) fail(400, 'Formato foto non valido')
+    const bytes = unb64(match[1])
+    if (bytes.length > MAX_PHOTO_BYTES) fail(400, 'Foto troppo grande')
+    if (bytes[0] !== 0xff || bytes[1] !== 0xd8) fail(400, 'Formato foto non valido')
+
+    const old = check(await db.from('boys').select('avatar_url').eq('id', boy.id).maybeSingle(), 'boys')
+    const url = await uploadToBucket(`${boy.id}/${crypto.randomUUID()}.jpg`, bytes)
+    check(await db.from('boys').update({ avatar_url: url }).eq('id', boy.id), 'save photo')
+    await removeFromBucket(old?.avatar_url)
+    return { ok: true, avatar_url: url }
+  },
+
+  'remove-photo': async body => {
+    const boy = await requireBoyOrOperator(body.token, body.boyId)
+    const old = check(await db.from('boys').select('avatar_url').eq('id', boy.id).maybeSingle(), 'boys')
+    check(await db.from('boys').update({ avatar_url: '' }).eq('id', boy.id), 'remove photo')
+    await removeFromBucket(old?.avatar_url)
+    return { ok: true }
+  },
+
   // --- operatore ---
+  'create-family-link': async body => {
+    await requireOperator(body.token)
+    const visitor = check(
+      await db.from('visitors').select('id').eq('active', true).order('id').limit(1).maybeSingle(),
+      'visitors'
+    )
+    if (!visitor) fail(404, 'Nessun profilo visitatore attivo')
+    return { ok: true, token: await createToken('visitor', visitor.id, FAMILY_LINK_DAYS) }
+  },
+
   'change-operator-password': async body => {
     const op = await requireOperator(body.token)
     const current = str(body.currentPassword)

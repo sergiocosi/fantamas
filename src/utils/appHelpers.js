@@ -12,7 +12,7 @@ export const COLOR_STYLES = {
 export const STATUS_STYLES = {
   pending: 'bg-yellow-50 border-yellow-200 text-yellow-800',
   approved: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-  modified: 'bg-sky-50 border-sky-200 text-sky-800',
+  modified: 'bg-amber-50 border-amber-200 text-amber-800',
   rejected: 'bg-rose-50 border-rose-200 text-rose-800',
 };
 
@@ -130,4 +130,38 @@ export function computeLeaderboard(users, requests, rules = [], monthKey = getMo
       };
     })
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'it'));
+}
+// ---------- Premio del mese ----------
+export const PRIZE = {
+  places: 2,
+  label: 'una cena',
+  shortLabel: 'cena',
+  emoji: '🍽️',
+};
+
+// Situazione del ragazzo rispetto al premio, a partire dalla classifica del mese.
+export function getPrizeStatus(leaderboard, userId) {
+  const index = leaderboard.findIndex(item => item.id === userId);
+  if (index < 0) return null;
+
+  const me = leaderboard[index];
+  const lastPrize = leaderboard[PRIZE.places - 1];
+
+  if (!lastPrize || (lastPrize.points <= 0 && me.points <= 0)) {
+    return { inPrize: false, text: 'Il mese è appena iniziato: ogni attività ti avvicina al podio!' };
+  }
+
+  if (index < PRIZE.places && me.points > 0) {
+    return { inPrize: true, text: `Sei ${index + 1}°: sei in zona ${PRIZE.shortLabel}! Tieni il ritmo.` };
+  }
+
+  const missing = lastPrize.points - me.points;
+  if (missing <= 0) {
+    return { inPrize: false, text: `Sei a pari punti con il ${PRIZE.places}°: basta un'altra attività per passare avanti!` };
+  }
+
+  return {
+    inPrize: false,
+    text: `Ti ${missing === 1 ? 'manca 1 punto' : `mancano ${missing} punti`} per raggiungere il ${PRIZE.places}° posto.`,
+  };
 }

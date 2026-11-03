@@ -16,17 +16,13 @@ export default function OperatorHomeScreen({
     <Shell
       title="Area Operatori"
       subtitle="Controllo rapido delle attività."
-      onBack={onLogout}
       currentUser={currentUser}
     >
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-neutral-600">
-          Operatore: <span className="font-semibold">{currentUser?.name || '—'}</span>
-        </div>
+      <div className="flex items-center justify-end mb-4">
 
         <button
           onClick={onLogout}
-          className="rounded-2xl px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold shadow-sm"
+          className="rounded-2xl px-3 py-2 bg-white border border-neutral-200 text-neutral-600 hover:text-rose-600 hover:border-rose-200 text-sm font-semibold shadow-sm"
         >
           Esci
         </button>

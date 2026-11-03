@@ -11,7 +11,7 @@ export default function BoyItemsScreen({
   return (
     <Shell
       title={selectedCategoryData.label}
-      subtitle="Scegli cosa hai fatto."
+      subtitle="Scegli cosa hai fatto. Un operatore confermerà i punti."
       onBack={goBack}
       currentUser={currentUser}
     >
@@ -24,12 +24,15 @@ export default function BoyItemsScreen({
             <div className="flex items-center justify-between gap-4">
               <div>
                 <div className="font-semibold">{rule.label}</div>
-                <div className="text-sm text-neutral-600">
-                  Richiesta da confermare dall’operatore
-                </div>
               </div>
-              <Pill className="bg-emerald-100 border-emerald-200 text-emerald-800">
-                +{rule.points}
+              <Pill
+                className={
+                  rule.points < 0
+                    ? 'bg-rose-100 border-rose-200 text-rose-800'
+                    : 'bg-emerald-100 border-emerald-200 text-emerald-800'
+                }
+              >
+                {rule.points > 0 ? '+' : ''}{rule.points}
               </Pill>
             </div>
           </ActionButton>
