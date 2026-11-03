@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Shell from '../ui/Shell';
 import Card from '../ui/Card';
 import ActionButton from '../ui/ActionButton';
-import { supabase } from '../../supabase';
+import { callApi } from '../../api';
 
 export default function OperatorChangePasswordScreen({
   currentUser,
@@ -47,12 +47,9 @@ export default function OperatorChangePasswordScreen({
   try {
     setIsSaving(true);
 
-    const { data, error } = await supabase.functions.invoke('change-operator-password', {
-      body: {
-        operatorId: currentUser.id,
-        currentPassword: currentPasswordInput.trim(),
-        newPassword: newPasswordInput.trim(),
-      },
+    const { data, error } = await callApi('change-operator-password', {
+      currentPassword: currentPasswordInput.trim(),
+      newPassword: newPasswordInput.trim(),
     });
 
     if (error) {

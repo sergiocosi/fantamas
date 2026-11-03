@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { supabase } from './supabase';
+import { callApi, saveSession, loadSession, clearSession } from './api';
 import {
   COLOR_STYLES,
   STATUS_STYLES,
@@ -30,26 +30,6 @@ import VisitorHomeScreen from './components/screens/VisitorHomeScreen';
 import VisitorRulesScreen from './components/screens/VisitorRulesScreen';
 import VisitorHowItWorksScreen from './components/screens/VisitorHowItWorksScreen';
 import BoyAvatarScreen from './components/screens/BoyAvatarScreen';
-
-const SESSION_STORAGE_KEY = 'fantamas_session';
-
-function saveSession(sessionData) {
-  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
-}
-
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    console.error('Errore lettura sessione:', error);
-    return null;
-  }
-}
-
-function clearSession() {
-  localStorage.removeItem(SESSION_STORAGE_KEY);
-}
 
 export default function FantaMasMockup() {
   const [appState, setAppState] = useState({
@@ -110,9 +90,7 @@ export default function FantaMasMockup() {
 
   async function loadSupabaseData() {
     try {
-      const { data, error } = await supabase.functions.invoke('get-app-data', {
-        body: {},
-      });
+      const { data, error } = await callApi('get-app-data', {});
 
       if (error) {
         console.error('Errore invoke get-app-data', error);
@@ -173,9 +151,9 @@ export default function FantaMasMockup() {
       return;
     }
 
-    const { role, userId } = savedSession;
+    const { role, userId, token } = savedSession;
 
-    if (!role || !userId) {
+    if (!role || !userId || !token) {
       clearSession();
       if (isMounted) setSessionRestored(true);
       return;
@@ -191,12 +169,7 @@ export default function FantaMasMockup() {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('bootstrap-session', {
-        body: {
-          role,
-          userId,
-        },
-      });
+      const { data, error } = await callApi('bootstrap-session');
 
       if (error) {
         console.error('Errore invoke bootstrap-session', error);
@@ -337,6 +310,8 @@ export default function FantaMasMockup() {
     () => computeLeaderboard(appState.users, appState.requests, appState.rules),
     [appState.users, appState.requests, appState.rules]
   );
+  const getLeaderboard = monthKey =>
+    computeLeaderboard(appState.users, appState.requests, appState.rules, monthKey);
   
   const pendingRequests = useMemo(
     () => appState.requests.filter(request => request.status === 'pending'),
@@ -372,12 +347,10 @@ export default function FantaMasMockup() {
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('login-operator', {
-      body: {
+    const { data, error } = await callApi('login-operator', {
         username,
         password,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke login-operator', error);
@@ -411,6 +384,7 @@ export default function FantaMasMockup() {
     saveSession({
       role: 'operator',
       userId: operator.id,
+      token: data.token,
       accessGranted: true,
     });
   } catch (err) {
@@ -429,12 +403,10 @@ export default function FantaMasMockup() {
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('login-visitor', {
-      body: {
+    const { data, error } = await callApi('login-visitor', {
         username,
         password,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke login-visitor', error);
@@ -468,6 +440,7 @@ export default function FantaMasMockup() {
     saveSession({
       role: 'visitor',
       userId: visitor.id,
+      token: data.token,
       accessGranted: true,
     });
   } catch (err) {
@@ -536,12 +509,10 @@ async function submitBoyPassword() {
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('login-boy', {
-      body: {
+    const { data, error } = await callApi('login-boy', {
         username,
         password,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke login-boy', error);
@@ -569,6 +540,7 @@ async function submitBoyPassword() {
     saveSession({
       role: 'boy',
       userId: boy.id,
+      token: data.token,
       accessGranted: true,
     });
   } catch (err) {
@@ -581,12 +553,10 @@ async function submitBoyPassword() {
   if (!currentUserId || !selectedAvatarKey) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('save-boy-avatar', {
-      body: {
+    const { data, error } = await callApi('save-boy-avatar', {
         boyId: currentUserId,
         avatarKey: selectedAvatarKey,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke save-boy-avatar', error);
@@ -630,13 +600,11 @@ async function submitBoyPassword() {
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('change-boy-password', {
-      body: {
+    const { data, error } = await callApi('change-boy-password', {
         boyId: currentUserId,
         currentPassword,
         newPassword: nextPassword,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke change-boy-password', error);
@@ -666,12 +634,10 @@ async function submitBoyPassword() {
   if (!passwordBoyId || !cleanPassword) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('reset-boy-password', {
-      body: {
+    const { data, error } = await callApi('reset-boy-password', {
         boyId: passwordBoyId,
         newPassword: cleanPassword,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke reset-boy-password', error);
@@ -696,12 +662,10 @@ async function submitRequest() {
   if (!currentUser?.id || !selectedRule?.id) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('submit-request', {
-      body: {
+    const { data, error } = await callApi('submit-request', {
         userId: currentUser.id,
         ruleId: selectedRule.id,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke submit-request', error);
@@ -729,13 +693,11 @@ async function submitRequest() {
   if (!currentUser?.name) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('decide-request', {
-      body: {
+    const { data, error } = await callApi('decide-request', {
         requestId,
         action,
         decidedBy: currentUser.name,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke decide-request', error);
@@ -770,14 +732,12 @@ async function submitRequest() {
   if (Number.isNaN(parsedPoints)) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('modify-request', {
-      body: {
+    const { data, error } = await callApi('modify-request', {
         requestId: modifyDraft.requestId,
         finalPoints: parsedPoints,
         note: modifyDraft.note,
         decidedBy: currentUser.name,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke modify-request', error);
@@ -803,11 +763,9 @@ async function submitRequest() {
   if (!cleanName) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('add-boy', {
-      body: {
+    const { data, error } = await callApi('add-boy', {
         name: cleanName,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke add-boy', error);
@@ -836,11 +794,9 @@ async function submitRequest() {
   if (!userToDelete || userToDelete.role !== 'boy') return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('delete-boy', {
-      body: {
+    const { data, error } = await callApi('delete-boy', {
         boyId: deleteBoyId,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke delete-boy', error);
@@ -869,15 +825,13 @@ async function submitRequest() {
   if (!category || !label || Number.isNaN(rawPoints)) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('add-rule-safe', {
-      body: {
+    const { data, error } = await callApi('add-rule', {
         category,
         label,
         points: rawPoints,
         kind: newRuleKind,
         boySelectable: newRuleSelectable,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke add-rule', error);
@@ -907,11 +861,9 @@ async function submitRequest() {
   if (!deleteRuleId) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('delete-rule', {
-      body: {
+    const { data, error } = await callApi('delete-rule', {
         ruleId: deleteRuleId,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke delete-rule', error);
@@ -942,16 +894,14 @@ async function submitRequest() {
   if (!category || !label || Number.isNaN(rawPoints)) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('update-rule', {
-      body: {
+    const { data, error } = await callApi('update-rule', {
         ruleId: editRuleId,
         category,
         label,
         points: rawPoints,
         kind: editRuleKind,
         boySelectable: editRuleSelectable,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke update-rule', error);
@@ -978,11 +928,9 @@ async function submitRequest() {
   if (!confirmed) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('delete-request', {
-      body: {
+    const { data, error } = await callApi('delete-request', {
         requestId,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke delete-request', error);
@@ -1007,12 +955,10 @@ async function submitRequest() {
   if (!editBoyId || !cleanName) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('update-boy', {
-      body: {
+    const { data, error } = await callApi('update-boy', {
         boyId: editBoyId,
         name: cleanName,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke update-boy', error);
@@ -1036,14 +982,12 @@ async function addManualOperatorEntry() {
   if (!currentUser?.name) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('add-manual-entry', {
-      body: {
+    const { data, error } = await callApi('add-manual-entry', {
         userId: operatorTargetUserId,
         ruleId: operatorRuleId,
         note: operatorNote,
         decidedBy: currentUser.name,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke add-manual-entry', error);
@@ -1069,14 +1013,12 @@ async function addArbitraryManualAdjustment({ userId, points, reason }) {
   if (!currentUser?.name) return;
 
   try {
-    const { data, error } = await supabase.functions.invoke('add-manual-adjustment', {
-      body: {
+    const { data, error } = await callApi('add-manual-adjustment', {
         userId,
         points: Number(points),
         reason: reason?.trim() || '',
         decidedBy: currentUser.name,
-      },
-    });
+      });
 
     if (error) {
       console.error('Errore invoke add-manual-adjustment', error);
@@ -1217,7 +1159,7 @@ if (screen === 'boy-leaderboard' && currentUser && boyAccessGranted) {
   return (
     <BoyLeaderboardScreen
       currentUser={currentUser}
-      leaderboard={leaderboard}
+      getLeaderboard={getLeaderboard}
       goBack={() => setScreen('boy-home')}
     />
   );
@@ -1376,7 +1318,7 @@ if (screen === 'boy-leaderboard' && currentUser && boyAccessGranted) {
     return (
       <BoyLeaderboardScreen
         currentUser={currentUser}
-        leaderboard={leaderboard}
+        getLeaderboard={getLeaderboard}
         goBack={() => setScreen('operator-home')}
       />
     );
@@ -1421,7 +1363,7 @@ if (screen === 'boy-leaderboard' && currentUser && boyAccessGranted) {
     return (
       <BoyLeaderboardScreen
         currentUser={currentUser}
-        leaderboard={leaderboard}
+        getLeaderboard={getLeaderboard}
         goBack={() => setScreen('visitor-home')}
       />
     );

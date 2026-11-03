@@ -64,7 +64,7 @@ export default function BoyHomeScreen({
         <Card className="lg:col-span-1 bg-orange-50 border-orange-200">
           <div className="text-sm text-neutral-600 mb-2 uppercase tracking-wider">I tuoi progressi</div>
           <div className="text-6xl font-black">{myPoints}</div>
-          <div className="text-neutral-700 mt-2 text-lg">punti totali</div>
+          <div className="text-neutral-700 mt-2 text-lg">punti questo mese</div>
           <div className="mt-4 flex flex-wrap gap-2">
             <Pill className="bg-white">Posizione: {myPosition || '-'}</Pill>
             <Pill className="bg-white">

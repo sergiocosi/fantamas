@@ -88,7 +88,26 @@ export function groupRules(rules) {
   }, {});
 }
 
-export function computeLeaderboard(users, requests, rules = []) {
+// Mese nel formato "2026-11", calcolato sull'ora locale.
+export function getMonthKey(value = new Date()) {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function shiftMonthKey(monthKey, delta) {
+  const [year, month] = monthKey.split('-').map(Number);
+  return getMonthKey(new Date(year, month - 1 + delta, 1));
+}
+
+export function formatMonthKey(monthKey) {
+  const [year, month] = monthKey.split('-').map(Number);
+  const label = new Date(year, month - 1, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+// Classifica del mese indicato (di default il mese corrente).
+// I punti contano nel mese in cui la richiesta è stata creata: il 1° del mese la classifica riparte da zero da sola.
+export function computeLeaderboard(users, requests, rules = [], monthKey = getMonthKey()) {
   const boys = users.filter(user => user.role === 'boy');
 
   return boys
@@ -97,7 +116,8 @@ export function computeLeaderboard(users, requests, rules = []) {
         .filter(
           request =>
             request.userId === user.id &&
-            ['approved', 'modified'].includes(request.status)
+            ['approved', 'modified'].includes(request.status) &&
+            getMonthKey(request.createdAt) === monthKey
         )
         .reduce((sum, request) => sum + getRequestPoints(request, rules), 0);
 

@@ -1,16 +1,32 @@
-# React + Vite
+# FantaMas
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Webapp per dare punti ai ragazzi per i compiti quotidiani, con classifica e premi a fine mese.
 
-Currently, two official plugins are available:
+- **Frontend**: React + Vite, pubblicato su Vercel (ogni push su `main` si aggiorna da solo).
+- **Backend**: Supabase. Una sola Edge Function, `api` (`supabase/functions/api/index.ts`), che gestisce tutte le azioni e controlla chi può fare cosa.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Ruoli
 
-## React Compiler
+- **Ragazzo**: invia richieste di punti, sceglie l'avatar, cambia la propria password.
+- **Operatore**: approva/modifica/rifiuta le richieste, aggiunge bonus/malus, gestisce ragazzi e regole.
+- **Visitatore**: vede classifica e regole.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Classifica mensile
 
-## Expanding the ESLint configuration
+La classifica mostra solo i punti del mese in corso e riparte da zero il 1° di ogni mese, senza cancellare niente.
+Con le frecce si vedono le classifiche dei mesi passati (utile per assegnare i premi).
+I punti contano nel mese in cui il ragazzo ha inviato la richiesta.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Aggiornare la funzione su Supabase
+
+Dashboard Supabase → Edge Functions → `api` → Code → incolla il contenuto di `supabase/functions/api/index.ts` → Deploy.
+Nelle impostazioni della funzione "Verify JWT" deve essere **disattivato** (il controllo lo fa il codice).
+
+## Sviluppo locale
+
+```bash
+npm install
+npm run dev
+```
+
+Serve un file `.env` con `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`.

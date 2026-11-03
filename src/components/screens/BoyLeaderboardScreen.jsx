@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import Shell from '../ui/Shell';
 import Card from '../ui/Card';
 import { getAvatarOption } from '../../data/avatars';
+import { getMonthKey, shiftMonthKey, formatMonthKey } from '../../utils/appHelpers';
 
 function getInitials(name = '') {
   return name
@@ -13,16 +15,40 @@ function getInitials(name = '') {
 
 export default function BoyLeaderboardScreen({
   currentUser,
-  leaderboard,
+  getLeaderboard,
   goBack,
 }) {
+  const currentMonth = getMonthKey();
+  const [monthKey, setMonthKey] = useState(currentMonth);
+  const leaderboard = getLeaderboard(monthKey);
+  const isCurrentMonth = monthKey === currentMonth;
+
   return (
     <Shell
       title="Classifica"
-      subtitle="Punteggio totale"
+      subtitle={isCurrentMonth ? `Punti di ${formatMonthKey(monthKey).toLowerCase()}` : `Classifica finale di ${formatMonthKey(monthKey).toLowerCase()}`}
       onBack={goBack}
       currentUser={currentUser}
     >
+      <div className="max-w-4xl flex items-center justify-between gap-3 mb-4">
+        <button
+          type="button"
+          onClick={() => setMonthKey(shiftMonthKey(monthKey, -1))}
+          className="px-4 py-2 rounded-2xl border border-neutral-200 bg-white font-semibold hover:bg-neutral-50"
+        >
+          ← Mese prima
+        </button>
+        <div className="font-black text-lg text-center">{formatMonthKey(monthKey)}</div>
+        <button
+          type="button"
+          onClick={() => setMonthKey(shiftMonthKey(monthKey, 1))}
+          disabled={isCurrentMonth}
+          className="px-4 py-2 rounded-2xl border border-neutral-200 bg-white font-semibold hover:bg-neutral-50 disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          Mese dopo →
+        </button>
+      </div>
+
       <div className="max-w-4xl grid gap-3">
         {leaderboard.map((item, index) => {
           const avatarOption = getAvatarOption(item.avatar_key);
