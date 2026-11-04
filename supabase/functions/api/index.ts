@@ -391,6 +391,74 @@ const actions: Record<string, Handler> = {
   },
 
   // --- operatore ---
+  'list-operators': async body => {
+    const me = await requireOperator(body.token)
+    const operators = check(
+      await db.from('operators').select('id, name, username, active').order('name'),
+      'operators'
+    )
+    return { ok: true, meId: me.id, operators: (operators || []).filter(op => op.active === true) }
+  },
+
+  'add-operator': async body => {
+    await requireOperator(body.token)
+    const name = str(body.name)
+    const username = str(body.username).toLowerCase()
+    const password = str(body.password)
+    if (!name || !username) fail(400, 'Nome e username sono obbligatori')
+    if (!/^[a-z0-9._-]+$/.test(username)) fail(400, 'Lo username può contenere solo lettere minuscole, numeri, punto e trattino')
+    if (password.length < 4) fail(400, 'La password deve contenere almeno 4 caratteri')
+
+    const existing = check(
+      await db.from('operators').select('id, active').eq('username', username).maybeSingle(),
+      'operators'
+    )
+    const hashed = await hashPassword(password)
+    if (existing?.active === true) fail(409, 'Esiste già un operatore con questo username')
+    if (existing) {
+      // era stato eliminato: lo riattivo con i nuovi dati
+      check(await db.from('operators').update({ name, password: hashed, active: true }).eq('id', existing.id), 'operators')
+      return { ok: true }
+    }
+
+    const row = { name, username, password: hashed, active: true }
+    let result = await db.from('operators').insert(row)
+    if (result.error && /null value.*"id"/i.test(result.error.message)) {
+      result = await db.from('operators').insert({ id: crypto.randomUUID(), ...row })
+    }
+    check(result, 'add operator')
+    return { ok: true }
+  },
+
+  'reset-operator-password': async body => {
+    await requireOperator(body.token)
+    const next = str(body.newPassword)
+    if (next.length < 4) fail(400, 'La password deve contenere almeno 4 caratteri')
+    const data = check(
+      await db
+        .from('operators')
+        .update({ password: await hashPassword(next) })
+        .eq('id', str(body.operatorId))
+        .select('id')
+        .maybeSingle(),
+      'reset operator password'
+    )
+    if (!data) fail(404, 'Operatore non trovato')
+    return { ok: true }
+  },
+
+  'delete-operator': async body => {
+    const me = await requireOperator(body.token)
+    const id = str(body.operatorId)
+    if (id === me.id) fail(400, 'Non puoi eliminare te stesso')
+    const active = check(await db.from('operators').select('id').eq('active', true), 'operators') || []
+    if (!active.some(op => op.id === id)) fail(404, 'Operatore non trovato')
+    if (active.length <= 1) fail(400, "Deve restare almeno un operatore")
+    // disattivazione: non perde lo storico e le sue sessioni smettono subito di funzionare
+    check(await db.from('operators').update({ active: false }).eq('id', id), 'delete operator')
+    return { ok: true }
+  },
+
   'create-family-link': async body => {
     await requireOperator(body.token)
     const visitor = check(

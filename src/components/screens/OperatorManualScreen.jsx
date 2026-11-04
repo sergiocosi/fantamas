@@ -1,7 +1,166 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Shell from '../ui/Shell';
 import Card from '../ui/Card';
 import Avatar from '../ui/Avatar';
+import { callApi } from '../../api';
+
+const inputClass = 'w-full rounded-2xl border border-neutral-300 px-4 py-3 shadow-sm';
+
+function OperatorsCard() {
+  const [operators, setOperators] = useState([]);
+  const [meId, setMeId] = useState('');
+  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordFor, setPasswordFor] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const { data } = await callApi('list-operators');
+    if (data?.ok) {
+      setOperators(data.operators || []);
+      setMeId(data.meId || '');
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function run(endpoint, payload, okMessage) {
+    setBusy(true);
+    const { data, error } = await callApi(endpoint, payload);
+    setBusy(false);
+    if (error || !data?.ok) {
+      alert(data?.error || 'Operazione non riuscita');
+      return false;
+    }
+    if (okMessage) alert(okMessage);
+    await load();
+    return true;
+  }
+
+  async function handleAdd() {
+    const done = await run(
+      'add-operator',
+      { name: name.trim(), username: username.trim(), password: password.trim() },
+      `Operatore creato. Può entrare con username "${username.trim().toLowerCase()}" e la password che hai scelto.`
+    );
+    if (done) {
+      setName('');
+      setUsername('');
+      setPassword('');
+    }
+  }
+
+  async function handlePassword(op) {
+    const done = await run(
+      'reset-operator-password',
+      { operatorId: op.id, newPassword: newPassword.trim() },
+      `Password di ${op.name} aggiornata.`
+    );
+    if (done) {
+      setPasswordFor('');
+      setNewPassword('');
+    }
+  }
+
+  async function handleDelete(op) {
+    if (!window.confirm(`Vuoi davvero eliminare l'operatore ${op.name}?\n\nNon potrà più entrare. Lo storico dei punti che ha gestito resta.`)) return;
+    await run('delete-operator', { operatorId: op.id });
+  }
+
+  return (
+    <Card>
+      <div className="text-2xl font-black mb-5">🧑‍🏫 Operatori</div>
+
+      <div className="grid gap-3 mb-6 pb-6 border-b border-neutral-200">
+        {operators.map(op => (
+          <div key={op.id} className="rounded-2xl border border-neutral-200 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-bold">
+                  {op.name}
+                  {op.id === meId && <span className="text-sm font-normal text-neutral-500"> (tu)</span>}
+                </div>
+                <div className="text-sm text-neutral-500">username: {op.username}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPasswordFor(passwordFor === op.id ? '' : op.id);
+                    setNewPassword('');
+                  }}
+                  className="rounded-2xl px-4 py-2 bg-white border border-neutral-300 font-semibold hover:bg-neutral-50"
+                >
+                  Cambia password
+                </button>
+                {op.id !== meId && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(op)}
+                    disabled={busy}
+                    className="rounded-2xl px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+                  >
+                    Elimina
+                  </button>
+                )}
+              </div>
+            </div>
+            {passwordFor === op.id && (
+              <div className="mt-3 grid sm:grid-cols-[1fr_auto] gap-3">
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={event => setNewPassword(event.target.value)}
+                  className={inputClass}
+                  placeholder="Nuova password (almeno 4 caratteri)"
+                />
+                <button
+                  type="button"
+                  onClick={() => handlePassword(op)}
+                  disabled={busy}
+                  className="rounded-2xl px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold"
+                >
+                  Salva
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="text-lg font-bold mb-3">Aggiungi un operatore</div>
+      <div className="grid md:grid-cols-3 gap-3">
+        <input value={name} onChange={event => setName(event.target.value)} className={inputClass} placeholder="Nome (es. Luisa)" />
+        <input
+          value={username}
+          onChange={event => setUsername(event.target.value)}
+          className={inputClass}
+          placeholder="Username (es. luisa)"
+          autoCapitalize="none"
+        />
+        <input
+          type="text"
+          value={password}
+          onChange={event => setPassword(event.target.value)}
+          className={inputClass}
+          placeholder="Password"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={handleAdd}
+        disabled={busy}
+        className="mt-3 rounded-2xl px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
+      >
+        Aggiungi operatore
+      </button>
+    </Card>
+  );
+}
 
 function PhotoCard({ boys, uploadPhoto, removePhoto }) {
   const [boyId, setBoyId] = useState('');
@@ -535,6 +694,8 @@ if (section === 'manage') {
           </div>
         </div>
         </Card>
+
+        <OperatorsCard />
 
         <FamilyLinkCard createFamilyLink={createFamilyLink} />
       </div>
