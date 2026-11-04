@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { callApi, saveSession, loadSession, clearSession } from './api';
 import {
   COLOR_STYLES,
@@ -39,7 +39,9 @@ export default function FantaMasMockup() {
     rules: [],
     requests: [],
   });
-  const [screen, setScreen] = useState('landing');
+  const [screen, setScreen] = useState(() =>
+    loadSession()?.accessGranted || window.location.search.includes('famiglie=') ? 'loading' : 'landing'
+  );
   const [currentUserId, setCurrentUserId] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedRuleId, setSelectedRuleId] = useState('');
@@ -166,7 +168,10 @@ export default function FantaMasMockup() {
     const savedSession = loadSession();
 
     if (!savedSession?.accessGranted) {
-      if (isMounted) setSessionRestored(true);
+      if (isMounted) {
+        setScreen('landing');
+        setSessionRestored(true);
+      }
       return;
     }
 
@@ -174,7 +179,10 @@ export default function FantaMasMockup() {
 
     if (!role || !userId || !token) {
       clearSession();
-      if (isMounted) setSessionRestored(true);
+      if (isMounted) {
+        setScreen('landing');
+        setSessionRestored(true);
+      }
       return;
     }
 
@@ -187,23 +195,40 @@ export default function FantaMasMockup() {
       setCurrentVisitor(null);
     }
 
+    let data = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const result = await callApi('bootstrap-session');
+        data = result.data;
+        const status = result.status || 0;
+        // risposta chiara dal server: sessione valida oppure scaduta
+        if (data?.ok || (status >= 400 && status < 500)) break;
+      } catch (err) {
+        console.error('Eccezione bootstrap session', err);
+      }
+      data = null;
+      await new Promise(resolve => setTimeout(resolve, 1500 * attempt));
+    }
+
+    if (!isMounted) return;
+
+    if (data === null) {
+      // problema di connessione: la sessione resta salvata, si ritenta al prossimo caricamento
+      alert('Connessione non disponibile. Controlla internet e ricarica la pagina.');
+      setScreen('landing');
+      setSessionRestored(true);
+      return;
+    }
+
+    if (!data.ok || !data.user) {
+      console.error('Sessione non valida', data.error);
+      clearSession();
+      setScreen('landing');
+      setSessionRestored(true);
+      return;
+    }
+
     try {
-      const { data, error } = await callApi('bootstrap-session');
-
-      if (error) {
-        console.error('Errore invoke bootstrap-session', error);
-        clearSession();
-        if (isMounted) setSessionRestored(true);
-        return;
-      }
-
-      if (!data?.ok || !data?.user) {
-        console.error('Errore bootstrap session', data?.error);
-        clearSession();
-        if (isMounted) setSessionRestored(true);
-        return;
-      }
-
       const user = data.user;
 
       if (role === 'boy') {
@@ -249,11 +274,12 @@ export default function FantaMasMockup() {
       }
 
       clearSession();
-      if (isMounted) setSessionRestored(true);
+      setScreen('landing');
+      setSessionRestored(true);
     } catch (err) {
-      console.error('Eccezione bootstrap session', err);
-      clearSession();
-      if (isMounted) setSessionRestored(true);
+      console.error('Eccezione ripristino sessione', err);
+      setScreen('landing');
+      setSessionRestored(true);
     }
   }
 
@@ -263,6 +289,40 @@ export default function FantaMasMockup() {
     isMounted = false;
   };
 }, []);
+
+  // ---------- Tasto "indietro" del telefono / browser ----------
+  const accessRef = useRef({ boy: false, operator: false, visitor: false });
+  accessRef.current = { boy: boyAccessGranted, operator: operatorAccessGranted, visitor: visitorAccessGranted };
+
+  useEffect(() => {
+    if (screen === 'loading') return;
+    if (window.history.state?.fantamasScreen === screen) return;
+    const isFirst = !window.history.state?.fantamasScreen;
+    const state = { fantamasScreen: screen };
+    if (isFirst) window.history.replaceState(state, '');
+    else window.history.pushState(state, '');
+  }, [screen]);
+
+  useEffect(() => {
+    function onPopState(event) {
+      const target = event.state?.fantamasScreen;
+      const access = accessRef.current;
+      const home = access.boy ? 'boy-home' : access.operator ? 'operator-home' : access.visitor ? 'visitor-home' : 'landing';
+      const loggedIn = home !== 'landing';
+      const isPublic = !target || target === 'landing' || target.endsWith('-login');
+      const sameRole = target && home !== 'landing' && target.startsWith(home.split('-')[0] + '-');
+
+      let next = target || home;
+      if (loggedIn && (isPublic || !sameRole)) next = home; // da dentro l'app non si torna alla pagina di login
+      if (!loggedIn && !isPublic) next = 'landing'; // dopo l'uscita non si rientra con "indietro"
+
+      if (next !== target) window.history.replaceState({ fantamasScreen: next }, '');
+      setScreen(next);
+    }
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   useEffect(() => {
     const boysList = appState.users.filter(user => user.role === 'boy');
@@ -1137,6 +1197,15 @@ async function addArbitraryManualAdjustment({ userId, points, reason }) {
     alert('Errore durante il bonus/malus manuale');
   }
 }
+
+  if (screen === 'loading' || (!sessionRestored && screen !== 'landing')) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-gradient-to-b from-orange-50 to-white">
+        <div className="text-4xl font-black text-orange-600">FantaMas</div>
+        <div className="text-neutral-500">Un attimo…</div>
+      </div>
+    );
+  }
 
   if (screen === 'landing') {
     return (

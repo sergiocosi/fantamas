@@ -59,7 +59,7 @@ export default function OperatorHomeScreen({
         <ActionButton onClick={goToManage}>
           <div className="text-3xl mb-2">⚙️</div>
           <div className="font-semibold">Gestione</div>
-          <div className="text-sm text-neutral-600">Ragazzi, regole e password</div>
+          <div className="text-sm text-neutral-600">Ragazzi, operatori, regole</div>
         </ActionButton>
 
         <ActionButton onClick={goToHistory}>

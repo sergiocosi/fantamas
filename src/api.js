@@ -41,11 +41,11 @@ export async function callApi(endpoint, payload = {}) {
   if (error && error.context && typeof error.context.json === 'function') {
     try {
       const body = await error.context.json();
-      if (body && typeof body === 'object') return { data: body, error: null };
+      if (body && typeof body === 'object') return { data: body, error: null, status: error.context.status };
     } catch {
       // risposta non leggibile: restituisco l'errore originale
     }
   }
 
-  return { data, error };
+  return { data, error, status: error ? 0 : 200 };
 }
