@@ -1,17 +1,8 @@
 import { useState } from 'react';
 import Shell from '../ui/Shell';
 import Card from '../ui/Card';
-import { getAvatarOption } from '../../data/avatars';
-import { getMonthKey, shiftMonthKey, formatMonthKey } from '../../utils/appHelpers';
-
-function getInitials(name = '') {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(part => part[0]?.toUpperCase() || '')
-    .join('');
-}
+import Avatar from '../ui/Avatar';
+import { getMonthKey, shiftMonthKey, formatMonthKey, PRIZE } from '../../utils/appHelpers';
 
 export default function BoyLeaderboardScreen({
   currentUser,
@@ -51,7 +42,7 @@ export default function BoyLeaderboardScreen({
 
       <div className="max-w-4xl grid gap-3">
         {leaderboard.map((item, index) => {
-          const avatarOption = getAvatarOption(item.avatar_key);
+          const wins = index < PRIZE.places && item.points > 0;
 
           return (
             <Card
@@ -64,32 +55,15 @@ export default function BoyLeaderboardScreen({
                     {index + 1}
                   </div>
 
-                  <div className="w-12 h-12 rounded-full overflow-hidden bg-neutral-200 flex items-center justify-center text-sm font-bold text-neutral-700 shrink-0">
-                    {avatarOption ? (
-                      <div className="text-2xl">{avatarOption.emoji}</div>
-                    ) : item.avatar_url ? (
-                      <img
-                        src={item.avatar_url}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                        onError={event => {
-                          event.currentTarget.style.display = 'none';
-                          const fallback = event.currentTarget.nextSibling;
-                          if (fallback) fallback.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-
-                    <div
-                      className="w-full h-full items-center justify-center"
-                      style={{ display: avatarOption || item.avatar_url ? 'none' : 'flex' }}
-                    >
-                      {getInitials(item.name)}
-                    </div>
-                  </div>
+                  <Avatar user={item} size="md" />
 
                   <div className="min-w-0">
                     <div className="font-semibold truncate">{item.name}</div>
+                    {wins && (
+                      <div className="text-sm text-emerald-700 font-semibold">
+                        {PRIZE.emoji} {isCurrentMonth ? `In zona ${PRIZE.shortLabel}` : `Ha vinto ${PRIZE.label}`}
+                      </div>
+                    )}
                     {item.id === currentUser.id && (
                       <div className="text-sm text-neutral-600">Questo sei tu</div>
                     )}

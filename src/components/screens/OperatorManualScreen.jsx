@@ -1,6 +1,126 @@
 import { useState } from 'react';
 import Shell from '../ui/Shell';
 import Card from '../ui/Card';
+import Avatar from '../ui/Avatar';
+
+function PhotoCard({ boys, uploadPhoto, removePhoto }) {
+  const [boyId, setBoyId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const boy = boys.find(item => item.id === boyId);
+
+  async function handleFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !boyId) return;
+    setBusy(true);
+    await uploadPhoto(boyId, file);
+    setBusy(false);
+  }
+
+  async function handleRemove() {
+    if (!boy || !window.confirm(`Togliere la foto di ${boy.name}?`)) return;
+    setBusy(true);
+    await removePhoto(boyId);
+    setBusy(false);
+  }
+
+  return (
+    <Card>
+      <div className="text-2xl font-black mb-5">📷 Foto dei ragazzi</div>
+      <div className="grid sm:grid-cols-[auto_1fr] gap-4 items-center">
+        <Avatar user={boy} size="xl" />
+        <div className="grid gap-3">
+          <select
+            value={boyId}
+            onChange={event => setBoyId(event.target.value)}
+            className="w-full rounded-2xl border border-neutral-300 px-4 py-3 bg-white shadow-sm"
+          >
+            <option value="">Seleziona un ragazzo</option>
+            {boys.map(item => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+                {item.avatar_url ? ' 📷' : ''}
+              </option>
+            ))}
+          </select>
+          <label
+            className={`rounded-2xl px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-sm text-center cursor-pointer ${
+              !boyId || busy ? 'opacity-50 pointer-events-none' : ''
+            }`}
+          >
+            {busy ? 'Un attimo…' : boy?.avatar_url ? 'Cambia foto' : 'Carica foto'}
+            <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={!boyId || busy} />
+          </label>
+          {boy?.avatar_url && (
+            <button
+              type="button"
+              onClick={handleRemove}
+              disabled={busy}
+              className="rounded-2xl px-5 py-3 bg-white border border-neutral-200 text-neutral-700 font-semibold hover:bg-neutral-50"
+            >
+              Togli foto
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="text-sm text-neutral-500 mt-4">
+        Le foto sono visibili a ragazzi, operatori e famiglie. Usale solo per chi ha dato il consenso.
+      </div>
+    </Card>
+  );
+}
+
+function FamilyLinkCard({ createFamilyLink }) {
+  const [link, setLink] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  async function handleCreate() {
+    const created = await createFamilyLink();
+    if (created) {
+      setLink(created);
+      setCopied(false);
+    }
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+    } catch {
+      alert('Copia non riuscita: tieni premuto sul link e copialo a mano.');
+    }
+  }
+
+  return (
+    <Card>
+      <div className="text-2xl font-black mb-2">👨‍👩‍👧 Link per le famiglie</div>
+      <div className="text-neutral-600 mb-4">
+        Un link da mandare su WhatsApp: chi lo apre entra in modalità visitatore (classifica e attività) senza
+        scrivere nessuna password. Vale un anno.
+      </div>
+      {!link ? (
+        <button
+          type="button"
+          onClick={handleCreate}
+          className="rounded-2xl px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-sm"
+        >
+          Crea link
+        </button>
+      ) : (
+        <div className="grid gap-3">
+          <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm break-all select-all">{link}</div>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="rounded-2xl px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-sm"
+          >
+            {copied ? '✓ Copiato!' : 'Copia link'}
+          </button>
+        </div>
+      )}
+    </Card>
+  );
+}
 
 
 export default function OperatorManualScreen({
@@ -57,6 +177,9 @@ export default function OperatorManualScreen({
   updateRule,
   addManualOperatorEntry,
   addArbitraryManualAdjustment,
+  uploadPhoto,
+  removePhoto,
+  createFamilyLink,
   goBack,
   section = 'points',
 }) {
@@ -181,7 +304,7 @@ if (section === 'manage') {
             <div>
               <button
                 onClick={updateBoy}
-                className="rounded-2xl px-5 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold shadow-sm"
+                className="rounded-2xl px-5 py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-sm"
               >
                 Salva modifica ragazzo
               </button>
@@ -230,6 +353,8 @@ if (section === 'manage') {
           </div>
         </div>
         </Card>
+
+        <PhotoCard boys={boys} uploadPhoto={uploadPhoto} removePhoto={removePhoto} />
 
         <Card>
           <div className="text-2xl font-black mb-5">📚 Regole</div>
@@ -402,7 +527,7 @@ if (section === 'manage') {
             <div>
               <button
                 onClick={updateRule}
-                className="rounded-2xl px-5 py-3 bg-sky-600 hover:bg-sky-700 text-white font-bold shadow-sm"
+                className="rounded-2xl px-5 py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold shadow-sm"
               >
                 Salva modifica regola
               </button>
@@ -410,6 +535,8 @@ if (section === 'manage') {
           </div>
         </div>
         </Card>
+
+        <FamilyLinkCard createFamilyLink={createFamilyLink} />
       </div>
     </Shell>
   );

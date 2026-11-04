@@ -8,7 +8,9 @@ import {
   getStatusLabel,
   groupRules,
   computeLeaderboard,
+  getPrizeStatus,
 } from './utils/appHelpers';
+import { photoToJpegDataUrl } from './utils/photo';
 
 import LandingScreen from './components/screens/LandingScreen';
 import OperatorLoginScreen from './components/screens/OperatorLoginScreen';
@@ -144,6 +146,23 @@ export default function FantaMasMockup() {
   let isMounted = true;
 
   async function restoreSession() {
+    // Link per le famiglie: ?famiglie=<token> → entra come visitatore
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const familyToken = params.get('famiglie');
+      if (familyToken) {
+        const current = loadSession();
+        if (!current?.accessGranted || current.role === 'visitor') {
+          saveSession({ role: 'visitor', userId: 'famiglie', token: familyToken, accessGranted: true });
+        }
+        params.delete('famiglie');
+        const rest = params.toString();
+        window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : ''));
+      }
+    } catch (err) {
+      console.error('Errore link famiglie', err);
+    }
+
     const savedSession = loadSession();
 
     if (!savedSession?.accessGranted) {
@@ -320,6 +339,10 @@ export default function FantaMasMockup() {
   );
   const myPoints = useMemo(
     () => leaderboard.find(item => item.id === currentUserId)?.points || 0,
+    [leaderboard, currentUserId]
+  );
+  const prizeStatus = useMemo(
+    () => getPrizeStatus(leaderboard, currentUserId),
     [leaderboard, currentUserId]
   );
   const myPosition = useMemo(
@@ -711,6 +734,71 @@ async function submitRequest() {
   }
 }
 
+  async function uploadPhoto(boyId, file) {
+    try {
+      const image = await photoToJpegDataUrl(file);
+      const { data, error } = await callApi('upload-photo', { boyId, image });
+      if (error || !data?.ok) {
+        alert(data?.error || 'Errore durante il caricamento della foto');
+        return false;
+      }
+      await loadSupabaseData();
+      return true;
+    } catch (err) {
+      console.error('Eccezione caricamento foto', err);
+      alert(err.message || 'Errore durante il caricamento della foto');
+      return false;
+    }
+  }
+
+  async function removePhoto(boyId) {
+    try {
+      const { data, error } = await callApi('remove-photo', { boyId });
+      if (error || !data?.ok) {
+        alert(data?.error || 'Errore durante la rimozione della foto');
+        return;
+      }
+      await loadSupabaseData();
+    } catch (err) {
+      console.error('Eccezione rimozione foto', err);
+      alert('Errore durante la rimozione della foto');
+    }
+  }
+
+  async function createFamilyLink() {
+    try {
+      const { data, error } = await callApi('create-family-link');
+      if (error || !data?.ok) {
+        alert(data?.error || 'Errore durante la creazione del link');
+        return '';
+      }
+      return `${window.location.origin}/?famiglie=${encodeURIComponent(data.token)}`;
+    } catch (err) {
+      console.error('Eccezione link famiglie', err);
+      alert('Errore durante la creazione del link');
+      return '';
+    }
+  }
+
+  async function approveAll() {
+    const toApprove = [...pendingRequests];
+    if (toApprove.length === 0) return;
+    if (!window.confirm(`Approvare tutte le ${toApprove.length} richieste in attesa?`)) return;
+
+    let failed = 0;
+    for (const request of toApprove) {
+      try {
+        const { data, error } = await callApi('decide-request', { requestId: request.id, action: 'approve' });
+        if (error || !data?.ok) failed++;
+      } catch {
+        failed++;
+      }
+    }
+
+    await loadSupabaseData();
+    if (failed > 0) alert(`${failed} richieste non sono state approvate: riprova.`);
+  }
+
   function startModify(request) {
     setModifyDraft({
       requestId: request.id,
@@ -1100,6 +1188,7 @@ async function addArbitraryManualAdjustment({ userId, points, reason }) {
         myPoints={myPoints}
         myPosition={myPosition}
         myRequests={myRequests}
+        prizeStatus={prizeStatus}
         goBack={logoutBoy}
         goToCategories={() => setScreen('boy-categories')}
         goToLeaderboard={() => setScreen('boy-leaderboard')}
@@ -1199,6 +1288,8 @@ if (screen === 'boy-leaderboard' && currentUser && boyAccessGranted) {
         selectedAvatarKey={selectedAvatarKey}
         setSelectedAvatarKey={setSelectedAvatarKey}
         saveAvatar={saveBoyAvatar}
+        uploadPhoto={uploadPhoto}
+        removePhoto={removePhoto}
         goBack={() => setScreen('boy-home')}
       />
     );
@@ -1242,6 +1333,7 @@ if (screen === 'boy-leaderboard' && currentUser && boyAccessGranted) {
         modifyDraft={modifyDraft}
         setModifyDraft={setModifyDraft}
         decideRequest={decideRequest}
+        approveAll={approveAll}
         startModify={startModify}
         saveModify={saveModify}
         goBack={() => setScreen('operator-home')}
@@ -1306,6 +1398,9 @@ if (screen === 'boy-leaderboard' && currentUser && boyAccessGranted) {
         updateRule={updateRule}
         addManualOperatorEntry={addManualOperatorEntry}
         addArbitraryManualAdjustment={addArbitraryManualAdjustment}
+        uploadPhoto={uploadPhoto}
+        removePhoto={removePhoto}
+        createFamilyLink={createFamilyLink}
         goBack={() => setScreen('operator-home')}
       />
     );

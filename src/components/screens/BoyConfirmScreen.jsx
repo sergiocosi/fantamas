@@ -19,7 +19,13 @@ export default function BoyConfirmScreen({
         <Card>
           <div className="text-sm text-neutral-500">Attività selezionata</div>
           <div className="text-2xl font-semibold mt-1">{selectedRule.label}</div>
-          <div className="mt-4 inline-flex rounded-full bg-emerald-100 text-emerald-800 px-4 py-2 font-semibold border border-emerald-200">
+          <div
+            className={`mt-4 inline-flex rounded-full px-4 py-2 font-semibold border ${
+              selectedRule.points < 0
+                ? 'bg-rose-100 text-rose-800 border-rose-200'
+                : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+            }`}
+          >
             Punti previsti: {selectedRule.points > 0 ? '+' : ''}{selectedRule.points}
           </div>
           <div className="mt-6 grid sm:grid-cols-2 gap-3">
